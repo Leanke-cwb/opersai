@@ -2,11 +2,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Home from "./pages/Home";
-
-// Importe suas páginas adicionais
 import CadastrarOperacao from "./pages/CadastrarOperacao";
 import CadastrarAlvo from "./pages/CadastrarAlvo";
 import ConsultaAlvos from "./pages/ConsultaAlvos";
+import AutoCircunstanciado from "./pages/AutoCircunstanciado";
 
 export default function App() {
   return (
@@ -20,6 +19,7 @@ export default function App() {
         <Route path="/operacao" element={<CadastrarOperacao />} />
         <Route path="/alvo" element={<CadastrarAlvo />} />
         <Route path="/consulta-alvos" element={<ConsultaAlvos />} />
+        <Route path="/auto-circunstanciado" element={<AutoCircunstanciado />} />
       </Routes>
     </BrowserRouter>
   );
