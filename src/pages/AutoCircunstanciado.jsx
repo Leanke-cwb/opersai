@@ -107,7 +107,7 @@ export default function AutoCircunstanciado() {
                     <th className="border border-gray-300 px-5 py-2 text-left max-w-xs break-words">
                       Nome do Alvo
                     </th>
-                    <th className="border border-gray-300 px-5 py-2 text-center max-w-[100px] break-words">
+                    <th className="border border-gray-300 px-5 py-2 text-left max-w-[100px] break-words">
                       Número do Alvo
                     </th>
                     <th className="border border-gray-300 px-5 py-2 text-center">
@@ -130,7 +130,7 @@ export default function AutoCircunstanciado() {
                             onClick={() => gerarAuto(alvo.id)}
                             className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
                           >
-                            Gerar Auto
+                            Auto Circunstanciado
                           </button>
                           <button
                             onClick={() => gerarCertidaoHash(alvo.id)}
@@ -143,6 +143,18 @@ export default function AutoCircunstanciado() {
                             className="bg-purple-500 text-white px-2 py-1 rounded hover:bg-purple-600"
                           >
                             Certidão Cumprimento
+                          </button>
+                          <button
+                            onClick={() => gerarCertidaoCumprimento(alvo.id)}
+                            className="bg-pink-500 text-white px-2 py-1 rounded hover:bg-pink-600"
+                          >
+                            Cadeia de Custódia
+                          </button>
+                          <button
+                            onClick={() => gerarCertidaoCumprimento(alvo.id)}
+                            className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600"
+                          >
+                            Cautela PM
                           </button>
                         </div>
                       </td>
