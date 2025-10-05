@@ -62,10 +62,20 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+    // ESTILOS DE FUNDO APLICADOS AQUI
+    <div
+      className="min-h-screen flex items-center justify-center"
+      style={{
+        backgroundImage: `url('${BACKGROUND_IMAGE_URL}')`,
+        backgroundSize: "contain",
+        backgroundPosition: "center", // Centraliza a imagem
+        backgroundRepeat: "no-repeat", // Evita repetição
+      }}
+    >
       <form
         onSubmit={handleLogin}
-        className="bg-white p-8 rounded-xl shadow-md w-full max-w-sm"
+        // Adicionando bg-opacity-90 para destacar o fundo
+        className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm bg-opacity-55"
       >
         <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
         {erro && <p className="text-red-500 text-sm mb-4">{erro}</p>}
