@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabase/client";
 
+const BACKGROUND_IMAGE_URL =
+  "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/coger.png";
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -38,15 +41,18 @@ export default function Login() {
       // Recupera dados temporários do localStorage
       const temp = JSON.parse(localStorage.getItem("cadastro_temp") || "{}");
 
-      const { error: insertError } = await supabase.from("usuarios").insert([{
-        user_id: data.user.id,
-        posto_graduacao: temp.posto_graduacao || "",
-        nome: temp.nome || "",
-        cpf: temp.cpf || "",
-        email: data.user.email
-      }]);
+      const { error: insertError } = await supabase.from("usuarios").insert([
+        {
+          user_id: data.user.id,
+          posto_graduacao: temp.posto_graduacao || "",
+          nome: temp.nome || "",
+          cpf: temp.cpf || "",
+          email: data.user.email,
+        },
+      ]);
 
-      if (insertError) console.error("Erro ao salvar dados extras:", insertError.message);
+      if (insertError)
+        console.error("Erro ao salvar dados extras:", insertError.message);
 
       // Remove dados temporários
       localStorage.removeItem("cadastro_temp");
@@ -57,18 +63,46 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <form onSubmit={handleLogin} className="bg-white p-8 rounded-xl shadow-md w-full max-w-sm">
+      <form
+        onSubmit={handleLogin}
+        className="bg-white p-8 rounded-xl shadow-md w-full max-w-sm"
+      >
         <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
         {erro && <p className="text-red-500 text-sm mb-4">{erro}</p>}
 
-        <input type="email" placeholder="Email" value={email} onChange={e => { setEmail(e.target.value); if (erro) setErro(""); }} className="w-full p-2 border rounded mb-4" />
-        <input type="password" placeholder="Senha" value={senha} onChange={e => { setSenha(e.target.value); if (erro) setErro(""); }} className="w-full p-2 border rounded mb-4" />
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            if (erro) setErro("");
+          }}
+          className="w-full p-2 border rounded mb-4"
+        />
+        <input
+          type="password"
+          placeholder="Senha"
+          value={senha}
+          onChange={(e) => {
+            setSenha(e.target.value);
+            if (erro) setErro("");
+          }}
+          className="w-full p-2 border rounded mb-4"
+        />
 
-        <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Entrar</button>
+        <button
+          type="submit"
+          className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+        >
+          Entrar
+        </button>
 
         <div className="text-center mt-4">
           <span className="text-gray-600">Não tem conta? </span>
-          <a href="/register" className="text-blue-600 hover:underline">Cadastre-se</a>
+          <a href="/register" className="text-blue-600 hover:underline">
+            Cadastre-se
+          </a>
         </div>
       </form>
     </div>
