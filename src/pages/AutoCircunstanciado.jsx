@@ -5,40 +5,66 @@ export default function AutoCircunstanciado() {
   const [operacoes, setOperacoes] = useState([]);
   const [operacaoSelecionada, setOperacaoSelecionada] = useState(null);
   const [alvos, setAlvos] = useState([]);
+  const [encerramentos, setEncerramentos] = useState([]);
 
+  // Buscar operações
   useEffect(() => {
     async function fetchOperacoes() {
-      let { data, error } = await supabase
+      const { data, error } = await supabase
         .from("operacoes")
         .select("id, nome_operacao, numero_autos")
         .order("created_at", { ascending: false });
-      if (error) {
-        console.error("Erro ao buscar operações:", error);
-      } else {
-        setOperacoes(data);
-      }
+
+      if (error) console.error("Erro ao buscar operações:", error);
+      else setOperacoes(data);
     }
     fetchOperacoes();
   }, []);
 
+  // Buscar alvos e encerramentos ao selecionar operação
   useEffect(() => {
-    async function fetchAlvos() {
-      if (!operacaoSelecionada) {
-        setAlvos([]);
-        return;
-      }
-      let { data, error } = await supabase
-        .from("alvos")
-        .select("id, nome, numero_alvo")
-        .eq("operacao_id", operacaoSelecionada.id);
-      if (error) {
-        console.error("Erro ao buscar alvos:", error);
-      } else {
-        setAlvos(data);
+    if (!operacaoSelecionada) {
+      setAlvos([]);
+      setEncerramentos([]);
+      return;
+    }
+
+    async function fetchDados() {
+      try {
+        // Buscar alvos
+        const { data: alvosData, error: alvosError } = await supabase
+          .from("alvos")
+          .select("id, nome, numero_alvo")
+          .eq("operacao_id", operacaoSelecionada.id);
+
+        if (alvosError) throw alvosError;
+        setAlvos(alvosData || []);
+
+        // Buscar encerramentos
+        const { data: encerramentosData, error: encerramentosError } =
+          await supabase
+            .from("operacoes_encerramento")
+            .select(
+              "id, alvo_id, encerrado, houve_apreensao, encerrado_em, medidas"
+            )
+            .eq("operacao_id", operacaoSelecionada.id);
+
+        if (encerramentosError) throw encerramentosError;
+
+        console.log("🔎 Encerramentos recebidos:", encerramentosData);
+        setEncerramentos(encerramentosData || []);
+      } catch (err) {
+        console.error("Erro ao buscar dados:", err);
       }
     }
-    fetchAlvos();
+
+    fetchDados();
   }, [operacaoSelecionada]);
+
+  // Detectar se alvo está encerrado
+  function getStatusAlvo(alvoId) {
+    return encerramentos.find((e) => e.alvo_id === alvoId) || null;
+  }
 
   function handleSelecionarOperacao(event) {
     const id = event.target.value;
@@ -46,20 +72,8 @@ export default function AutoCircunstanciado() {
     setOperacaoSelecionada(operacao);
   }
 
-  function gerarAuto(alvoId) {
-    console.log("Gerar Auto para alvo:", alvoId);
-  }
-
-  function gerarCertidaoHash(alvoId) {
-    console.log("Gerar Certidão de Hash para alvo:", alvoId);
-  }
-
-  function gerarCertidaoCumprimento(alvoId) {
-    console.log("Gerar Certidão de Cumprimento para alvo:", alvoId);
-  }
-
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-8 max-w-5xl mx-auto">
       <h1 className="text-2xl mb-6 font-bold">Gerar Documentação</h1>
 
       <label htmlFor="operacao-select" className="block mb-2">
@@ -82,89 +96,76 @@ export default function AutoCircunstanciado() {
       </select>
 
       {operacaoSelecionada && (
-        <>
-          <div className="mt-6 p-4 border rounded bg-gray-50">
-            <h2 className="text-xl font-semibold mb-2">Operação Selecionada</h2>
-            <p>
-              <strong>Nome:</strong> {operacaoSelecionada.nome_operacao}
-            </p>
-            <p>
-              <strong>Autos:</strong> {operacaoSelecionada.numero_autos}
-            </p>
-          </div>
+        <div className="mt-6">
+          <h2 className="text-xl font-semibold mb-4">
+            Alvos da operação: {operacaoSelecionada.nome_operacao}
+          </h2>
 
-          <div className="mt-6">
-            <h3 className="text-lg font-medium mb-4">Alvos da Operação</h3>
-            {alvos.length === 0 ? (
-              <p>Sem alvos cadastrados para esta operação.</p>
-            ) : (
-              <table
-                className="w-full table-auto border-collapse border border-gray-300"
-                style={{ tableLayout: "auto" }}
-              >
-                <thead>
-                  <tr className="bg-gray-200">
-                    <th className="border border-gray-300 px-5 py-2 text-left max-w-xs break-words">
-                      Nome do Alvo
-                    </th>
-                    <th className="border border-gray-300 px-5 py-2 text-left max-w-[100px] break-words">
-                      Número do Alvo
-                    </th>
-                    <th className="border border-gray-300 px-5 py-2 text-center">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {alvos.map((alvo) => (
+          {alvos.length === 0 ? (
+            <p>Sem alvos cadastrados para esta operação.</p>
+          ) : (
+            <table className="w-full table-auto border-collapse border border-gray-300">
+              <thead>
+                <tr className="bg-gray-200">
+                  <th className="border border-gray-300 px-4 py-2 text-left">
+                    Nome do Alvo
+                  </th>
+                  <th className="border border-gray-300 px-4 py-2 text-center">
+                    Nº do Alvo
+                  </th>
+                  <th className="border border-gray-300 px-4 py-2 text-center">
+                    Ações / Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {alvos.map((alvo) => {
+                  const status = getStatusAlvo(alvo.id);
+                  return (
                     <tr key={alvo.id} className="hover:bg-gray-100">
-                      <td className="border border-gray-300 px-4 py-2 max-w-xs break-words">
+                      <td className="border border-gray-300 px-4 py-2">
                         {alvo.nome}
                       </td>
-                      <td className="border border-gray-300 px-4 py-2 max-w-[100px] break-words text-center">
+                      <td className="border border-gray-300 px-4 py-2 text-center">
                         {alvo.numero_alvo}
                       </td>
                       <td className="border border-gray-300 px-4 py-2 text-center">
-                        <div className="flex justify-center space-x-2">
-                          <button
-                            onClick={() => gerarAuto(alvo.id)}
-                            className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-                          >
-                            Auto Circunstanciado
+                        <div className="flex flex-row flex-wrap justify-center items-center gap-2">
+                          <button className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">
+                            Auto
                           </button>
-                          <button
-                            onClick={() => gerarCertidaoHash(alvo.id)}
-                            className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
-                          >
-                            Certidão Hash
+                          <button className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600">
+                            Hash
                           </button>
-                          <button
-                            onClick={() => gerarCertidaoCumprimento(alvo.id)}
-                            className="bg-purple-500 text-white px-2 py-1 rounded hover:bg-purple-600"
-                          >
-                            Certidão Cumprimento
+                          <button className="bg-purple-500 text-white px-3 py-1 rounded hover:bg-purple-600">
+                            Cumprimento
                           </button>
-                          <button
-                            onClick={() => gerarCertidaoCumprimento(alvo.id)}
-                            className="bg-pink-500 text-white px-2 py-1 rounded hover:bg-pink-600"
-                          >
-                            Cadeia de Custódia
+                          <button className="bg-pink-500 text-white px-3 py-1 rounded hover:bg-pink-600">
+                            Custódia
                           </button>
-                          <button
-                            onClick={() => gerarCertidaoCumprimento(alvo.id)}
-                            className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600"
-                          >
-                            Cautela PM
+                          <button className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600">
+                            Cautela
                           </button>
+
+                          {/* ✅ Mostra o status sem remover os botões */}
+                          {status?.encerrado ? (
+                            <span className="text-green-600 font-semibold text-sm ml-3">
+                              ✅ Encerrada
+                            </span>
+                          ) : (
+                            <span className="text-gray-500 text-sm ml-3">
+                              ⏳ Em andamento
+                            </span>
+                          )}
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
     </div>
   );
