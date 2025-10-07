@@ -6,6 +6,7 @@ import CadastrarOperacao from "./pages/CadastrarOperacao";
 import CadastrarAlvo from "./pages/CadastrarAlvo";
 import ConsultaAlvos from "./pages/ConsultaAlvos";
 import AutoCircunstanciado from "./pages/AutoCircunstanciado";
+import Cautela from "./pages/Cautela";
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="/alvo" element={<CadastrarAlvo />} />
         <Route path="/consulta-alvos" element={<ConsultaAlvos />} />
         <Route path="/auto-circunstanciado" element={<AutoCircunstanciado />} />
+        <Route path="/cautela" element={<Cautela />} />
       </Routes>
     </BrowserRouter>
   );

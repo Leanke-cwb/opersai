@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabase/client";
+import { useNavigate } from "react-router-dom"; // ✅ import para navegação
 
 export default function AutoCircunstanciado() {
   const [operacoes, setOperacoes] = useState([]);
   const [operacaoSelecionada, setOperacaoSelecionada] = useState(null);
   const [alvos, setAlvos] = useState([]);
   const [encerramentos, setEncerramentos] = useState([]);
+  const navigate = useNavigate(); // ✅ hook de navegação
 
-  // Buscar operações
   useEffect(() => {
     async function fetchOperacoes() {
       const { data, error } = await supabase
@@ -21,7 +22,6 @@ export default function AutoCircunstanciado() {
     fetchOperacoes();
   }, []);
 
-  // Buscar alvos e encerramentos ao selecionar operação
   useEffect(() => {
     if (!operacaoSelecionada) {
       setAlvos([]);
@@ -31,7 +31,6 @@ export default function AutoCircunstanciado() {
 
     async function fetchDados() {
       try {
-        // Buscar alvos
         const { data: alvosData, error: alvosError } = await supabase
           .from("alvos")
           .select("id, nome, numero_alvo")
@@ -40,7 +39,6 @@ export default function AutoCircunstanciado() {
         if (alvosError) throw alvosError;
         setAlvos(alvosData || []);
 
-        // Buscar encerramentos
         const { data: encerramentosData, error: encerramentosError } =
           await supabase
             .from("operacoes_encerramento")
@@ -50,8 +48,6 @@ export default function AutoCircunstanciado() {
             .eq("operacao_id", operacaoSelecionada.id);
 
         if (encerramentosError) throw encerramentosError;
-
-        console.log("🔎 Encerramentos recebidos:", encerramentosData);
         setEncerramentos(encerramentosData || []);
       } catch (err) {
         console.error("Erro ao buscar dados:", err);
@@ -61,10 +57,30 @@ export default function AutoCircunstanciado() {
     fetchDados();
   }, [operacaoSelecionada]);
 
-  // Detectar se alvo está encerrado
   function getStatusAlvo(alvoId) {
     return encerramentos.find((e) => e.alvo_id === alvoId) || null;
   }
+
+  async function fetchItens(alvoId) {
+    const { data, error } = await supabase
+      .from("materiais_apreendidos")
+      .select("id, quantidade, descricao")
+      .eq("alvo_id", alvoId);
+
+    if (error) {
+      console.error("Erro ao buscar itens apreendidos:", error);
+      return [];
+    }
+    return data || [];
+  }
+
+  // ✅ função para navegar para a tela de cautela
+  const handleCautela = async (alvo) => {
+    const itens = await fetchItens(alvo.id);
+    localStorage.setItem("itensApreendidos", JSON.stringify(itens));
+    localStorage.setItem("nomeAlvo", alvo.nome || "");
+    navigate("/cautela");
+  };
 
   function handleSelecionarOperacao(event) {
     const id = event.target.value;
@@ -143,11 +159,15 @@ export default function AutoCircunstanciado() {
                           <button className="bg-pink-500 text-white px-3 py-1 rounded hover:bg-pink-600">
                             Custódia
                           </button>
-                          <button className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600">
+
+                          {/* ✅ botão Cautela agora navega */}
+                          <button
+                            onClick={() => handleCautela(alvo)}
+                            className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600"
+                          >
                             Cautela
                           </button>
 
-                          {/* ✅ Mostra o status sem remover os botões */}
                           {status?.encerrado ? (
                             <span className="text-green-600 font-semibold text-sm ml-3">
                               ✅ Encerrada
