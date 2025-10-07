@@ -1,9 +1,11 @@
-// src/screens/CautelaScreen.jsx
 import React, { useState, useEffect } from "react";
+import { supabase } from "../supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { useParams } from "react-router-dom";
 
 export default function CautelaScreen() {
+  const { alvoId, operacaoId } = useParams(); // pegamos ids da URL
   const [itens, setItens] = useState([]);
   const [numeroAutos, setNumeroAutos] = useState("");
   const [comandante, setComandante] = useState("");
@@ -22,26 +24,52 @@ export default function CautelaScreen() {
     const hoje = new Date();
     setDataAtual(hoje.toLocaleDateString("pt-BR"));
 
-    // Dados vindos do localStorage (salvos no clique do botão Cautela)
-    const dadosItens = JSON.parse(
-      localStorage.getItem("itensApreendidos") || "[]"
-    );
-    const dadosAlvoLS = JSON.parse(localStorage.getItem("dadosAlvo") || "{}");
-    const dadosOperacao = JSON.parse(
-      localStorage.getItem("dadosOperacao") || "{}"
-    );
-    const dadosUsuario = JSON.parse(
-      localStorage.getItem("dadosUsuario") || "{}"
-    );
+    async function fetchDados() {
+      try {
+        // 1️⃣ Pegar dados do alvo
+        const { data: alvoData, error: alvoError } = await supabase
+          .from("alvos")
+          .select("*")
+          .eq("id", alvoId)
+          .single();
+        if (alvoError) throw alvoError;
+        setDadosAlvo(alvoData);
+        setNomeAlvo(alvoData.nome);
+        setCpfAlvo(alvoData.cpf);
 
-    setItens(dadosItens);
-    setDadosAlvo(dadosAlvoLS);
-    setNumeroAutos(dadosOperacao.numero_autos || "");
-    setComandante(dadosUsuario.nome || "");
-    setCpfComandante(dadosUsuario.cpf || "");
-    setNomeAlvo(dadosAlvoLS.nome || "");
-    setCpfAlvo(dadosAlvoLS.cpf || "");
-  }, []);
+        // 2️⃣ Pegar dados da operação
+        const { data: operacaoData, error: operacaoError } = await supabase
+          .from("operacoes")
+          .select("*")
+          .eq("id", operacaoId)
+          .single();
+        if (operacaoError) throw operacaoError;
+        setNumeroAutos(operacaoData.numero_autos);
+
+        // 3️⃣ Pegar comandante / usuário que cumpriu mandado
+        const { data: usuarioData, error: usuarioError } = await supabase
+          .from("usuarios")
+          .select("*")
+          .eq("id", operacaoData.comandante_id) // ajusta conforme seu banco
+          .single();
+        if (usuarioError) throw usuarioError;
+        setComandante(usuarioData.nome);
+        setCpfComandante(usuarioData.cpf);
+
+        // 4️⃣ Pegar itens apreendidos
+        const { data: itensData, error: itensError } = await supabase
+          .from("materiais_apreendidos")
+          .select("*")
+          .eq("alvo_id", alvoId);
+        if (itensError) throw itensError;
+        setItens(itensData || []);
+      } catch (err) {
+        console.error("Erro ao buscar dados da cautela:", err);
+      }
+    }
+
+    fetchDados();
+  }, [alvoId, operacaoId]);
 
   const gerarPDF = () => {
     const doc = new jsPDF();
@@ -61,7 +89,6 @@ sendo que após a apreensão foram entregues na sede do(a) ${enderecoEntrega}, b
       { maxWidth: 180 }
     );
 
-    // tabela dos itens
     autoTable(doc, {
       startY: 115,
       head: [["Item nº", "Quant.", "Descrição do item"]],
@@ -91,7 +118,7 @@ sendo que após a apreensão foram entregues na sede do(a) ${enderecoEntrega}, b
     <div className="p-6 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Termo de Entrega - Cautela</h1>
 
-      {/* Pré-visualização do termo */}
+      {/* Pré-visualização do termo com dados do Supabase */}
       <div className="border p-4 mb-4 bg-gray-50 text-gray-800 whitespace-pre-wrap">
         Aos {dataAtual}, faço a entrega dos materiais relacionados e
         discriminados a seguir, apreendidos em decorrência de medida cautelar
