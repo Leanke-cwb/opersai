@@ -4,20 +4,20 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useParams } from "react-router-dom";
 
-export default function CautelaScreen() {
-  const { alvoId, operacaoId } = useParams(); // pegamos ids da URL
+export default function Cautela() {
+  const { alvoId, operacaoId } = useParams(); // IDs da URL
   const [itens, setItens] = useState([]);
   const [numeroAutos, setNumeroAutos] = useState("");
   const [comandante, setComandante] = useState("");
   const [cpfComandante, setCpfComandante] = useState("");
   const [nomeAlvo, setNomeAlvo] = useState("");
   const [cpfAlvo, setCpfAlvo] = useState("");
+  const [dadosAlvo, setDadosAlvo] = useState({});
   const [enderecoEntrega, setEnderecoEntrega] = useState("");
   const [bairroEntrega, setBairroEntrega] = useState("");
   const [cidadeEntrega, setCidadeEntrega] = useState("");
   const [nomeRecebedor, setNomeRecebedor] = useState("");
   const [cpfRecebedor, setCpfRecebedor] = useState("");
-  const [dadosAlvo, setDadosAlvo] = useState({});
   const [dataAtual, setDataAtual] = useState("");
 
   useEffect(() => {
@@ -26,7 +26,7 @@ export default function CautelaScreen() {
 
     async function fetchDados() {
       try {
-        // 1️⃣ Pegar dados do alvo
+        // 1️⃣ Dados do alvo
         const { data: alvoData, error: alvoError } = await supabase
           .from("alvos")
           .select("*")
@@ -37,7 +37,7 @@ export default function CautelaScreen() {
         setNomeAlvo(alvoData.nome);
         setCpfAlvo(alvoData.cpf);
 
-        // 2️⃣ Pegar dados da operação
+        // 2️⃣ Dados da operação
         const { data: operacaoData, error: operacaoError } = await supabase
           .from("operacoes")
           .select("*")
@@ -46,17 +46,17 @@ export default function CautelaScreen() {
         if (operacaoError) throw operacaoError;
         setNumeroAutos(operacaoData.numero_autos);
 
-        // 3️⃣ Pegar comandante / usuário que cumpriu mandado
+        // 3️⃣ Comandante (usuário que criou a operação)
         const { data: usuarioData, error: usuarioError } = await supabase
           .from("usuarios")
           .select("*")
-          .eq("id", operacaoData.comandante_id) // ajusta conforme seu banco
+          .eq("id", operacaoData.user_id) // user_id da operação
           .single();
         if (usuarioError) throw usuarioError;
         setComandante(usuarioData.nome);
         setCpfComandante(usuarioData.cpf);
 
-        // 4️⃣ Pegar itens apreendidos
+        // 4️⃣ Itens apreendidos
         const { data: itensData, error: itensError } = await supabase
           .from("materiais_apreendidos")
           .select("*")
@@ -78,11 +78,11 @@ export default function CautelaScreen() {
 
     doc.setFontSize(11);
     doc.text(
-      `Aos ${dataAtual}, faço a entrega dos materiais relacionados e discriminados a seguir, apreendidos em decorrência de medida cautelar exarada nos autos nº ${numeroAutos}. 
-Os materiais, arrecadados pelo(a) ${comandante}, CPF ${cpfComandante}, se encontravam sob posse do(a) ${nomeAlvo}, CPF ${cpfAlvo}, 
+      `Aos ${dataAtual}, faço a entrega dos materiais relacionados e discriminados a seguir, apreendidos em decorrência de medida cautelar exarada nos autos nº ${numeroAutos}.
+Os materiais, arrecadados pelo(a) ${comandante}, CPF ${cpfComandante}, se encontravam sob posse do(a) ${nomeAlvo}, CPF ${cpfAlvo},
 no endereço sito à ${dadosAlvo.endereco || ""}, bairro ${
         dadosAlvo.bairro || ""
-      }, na cidade de ${dadosAlvo.cidade || ""}, 
+      }, na cidade de ${dadosAlvo.cidade || ""},
 sendo que após a apreensão foram entregues na sede do(a) ${enderecoEntrega}, bairro ${bairroEntrega}, na cidade de ${cidadeEntrega}, Estado do Paraná, a(o) recebedor(a) abaixo identificado:`,
       15,
       35,
@@ -95,7 +95,7 @@ sendo que após a apreensão foram entregues na sede do(a) ${enderecoEntrega}, b
       body: itens.map((item, index) => [
         index + 1,
         item.quantidade || "-",
-        item.descricao || item.nome || "-",
+        item.descricao || item.item_nome || "-",
       ]),
     });
 
