@@ -1,187 +1,309 @@
-import React, { useState, useEffect } from "react";
+// src/screens/Cautela.jsx
+import React, { useEffect, useState } from "react";
 import { supabase } from "../supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { useParams } from "react-router-dom";
 
 export default function Cautela() {
-  const { alvoId, operacaoId } = useParams(); // IDs da URL
-  const [itens, setItens] = useState([]);
-  const [numeroAutos, setNumeroAutos] = useState("");
-  const [comandante, setComandante] = useState("");
-  const [cpfComandante, setCpfComandante] = useState("");
-  const [nomeAlvo, setNomeAlvo] = useState("");
-  const [cpfAlvo, setCpfAlvo] = useState("");
-  const [dadosAlvo, setDadosAlvo] = useState({});
-  const [enderecoEntrega, setEnderecoEntrega] = useState("");
-  const [bairroEntrega, setBairroEntrega] = useState("");
-  const [cidadeEntrega, setCidadeEntrega] = useState("");
-  const [nomeRecebedor, setNomeRecebedor] = useState("");
-  const [cpfRecebedor, setCpfRecebedor] = useState("");
-  const [dataAtual, setDataAtual] = useState("");
+  const [dados, setDados] = useState(null);
+  const [carregando, setCarregando] = useState(true);
+  const [form, setForm] = useState({
+    sede: "",
+    enderecoEntrega: "",
+    bairroEntrega: "",
+    cidadeEntrega: "",
+    nomeRecebedor: "",
+    cpfRecebedor: "",
+  });
 
   useEffect(() => {
-    const hoje = new Date();
-    setDataAtual(hoje.toLocaleDateString("pt-BR"));
-
-    async function fetchDados() {
+    async function buscarDados() {
       try {
-        // 1️⃣ Dados do alvo
-        const { data: alvoData, error: alvoError } = await supabase
+        // 🔹 Tenta ler de qualquer chave possível
+        let alvoId =
+          localStorage.getItem("alvoId") || localStorage.getItem("alvo_id");
+
+        if (!alvoId) {
+          console.error("❌ Nenhum alvo selecionado.");
+          setCarregando(false);
+          return;
+        }
+
+        // 🔹 Busca dados do alvo
+        const { data: alvo, error: erroAlvo } = await supabase
           .from("alvos")
           .select("*")
           .eq("id", alvoId)
           .single();
-        if (alvoError) throw alvoError;
-        setDadosAlvo(alvoData);
-        setNomeAlvo(alvoData.nome);
-        setCpfAlvo(alvoData.cpf);
 
-        // 2️⃣ Dados da operação
-        const { data: operacaoData, error: operacaoError } = await supabase
+        if (erroAlvo) throw erroAlvo;
+
+        // 🔹 Busca operação vinculada
+        const { data: operacao, error: erroOp } = await supabase
           .from("operacoes")
           .select("*")
-          .eq("id", operacaoId)
+          .eq("id", alvo?.operacao_id)
           .single();
-        if (operacaoError) throw operacaoError;
-        setNumeroAutos(operacaoData.numero_autos);
 
-        // 3️⃣ Comandante (usuário que criou a operação)
-        const { data: usuarioData, error: usuarioError } = await supabase
-          .from("usuarios")
-          .select("*")
-          .eq("id", operacaoData.user_id) // user_id da operação
-          .single();
-        if (usuarioError) throw usuarioError;
-        setComandante(usuarioData.nome);
-        setCpfComandante(usuarioData.cpf);
+        if (erroOp) throw erroOp;
 
-        // 4️⃣ Itens apreendidos
-        const { data: itensData, error: itensError } = await supabase
+        // 🔹 Busca cumprimento do mandado (forçando retorno de apenas 2 campos)
+        const { data: cumprimentoData, error: erroCumprimento } = await supabase
+          .from("cumprimento_mandado")
+          .select("comandante, cpf_comandante")
+          .eq("alvo_id", alvoId);
+
+        if (erroCumprimento) {
+          console.warn(
+            "⚠️ Erro ao buscar cumprimento:",
+            erroCumprimento.message
+          );
+        }
+
+        console.log("📋 Resultado cumprimento_mandado:", cumprimentoData);
+
+        const cumprimento = Array.isArray(cumprimentoData)
+          ? cumprimentoData[0]
+          : cumprimentoData || {};
+
+        // 🔹 Usuário logado
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        const userEmail = user?.email || null;
+
+        let dadosUser = null;
+        if (userEmail) {
+          const { data, error: erroUser } = await supabase
+            .from("usuarios")
+            .select("*")
+            .eq("email", userEmail)
+            .single();
+
+          if (!erroUser) dadosUser = data;
+        }
+
+        // 🔹 Busca materiais apreendidos
+        const { data: materiais, error: erroMateriais } = await supabase
           .from("materiais_apreendidos")
           .select("*")
           .eq("alvo_id", alvoId);
-        if (itensError) throw itensError;
-        setItens(itensData || []);
+
+        if (erroMateriais) throw erroMateriais;
+
+        console.log("✅ Alvo:", alvo);
+        console.log("✅ Operação:", operacao);
+        console.log("✅ Cumprimento:", cumprimento);
+        console.log("✅ Usuário:", dadosUser);
+        console.log("✅ Materiais:", materiais);
+
+        // 🔹 Monta estrutura final de dados
+        setDados({
+          alvo,
+          operacao,
+          cumprimento: {
+            comandante: cumprimento?.comandante || "-",
+            cpf_comandante: cumprimento?.cpf_comandante || "-",
+          },
+          usuario: dadosUser,
+          materiais,
+        });
       } catch (err) {
-        console.error("Erro ao buscar dados da cautela:", err);
+        console.error("❌ Erro ao carregar dados:", err.message);
+      } finally {
+        setCarregando(false);
       }
     }
 
-    fetchDados();
-  }, [alvoId, operacaoId]);
+    buscarDados();
+  }, []);
 
+  // 🔹 Função para formatar a data
+  const formatarDataPorExtenso = () => {
+    const data = new Date();
+    return data.toLocaleDateString("pt-BR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  };
+
+  // 🔹 Gera o PDF
   const gerarPDF = () => {
+    if (!dados) return alert("Os dados ainda não foram carregados!");
+
     const doc = new jsPDF();
-    doc.setFontSize(14);
-    doc.text("TERMO DE ENTREGA", 105, 20, { align: "center" });
+    const dataAtual = formatarDataPorExtenso();
 
+    doc.setFontSize(12);
+    doc.text("TERMO DE ENTREGA - CAUTELA", 70, 20);
     doc.setFontSize(11);
-    doc.text(
-      `Aos ${dataAtual}, faço a entrega dos materiais relacionados e discriminados a seguir, apreendidos em decorrência de medida cautelar exarada nos autos nº ${numeroAutos}.
-Os materiais, arrecadados pelo(a) ${comandante}, CPF ${cpfComandante}, se encontravam sob posse do(a) ${nomeAlvo}, CPF ${cpfAlvo},
-no endereço sito à ${dadosAlvo.endereco || ""}, bairro ${
-        dadosAlvo.bairro || ""
-      }, na cidade de ${dadosAlvo.cidade || ""},
-sendo que após a apreensão foram entregues na sede do(a) ${enderecoEntrega}, bairro ${bairroEntrega}, na cidade de ${cidadeEntrega}, Estado do Paraná, a(o) recebedor(a) abaixo identificado:`,
-      15,
-      35,
-      { maxWidth: 180 }
-    );
 
+    const texto = `
+Aos ${dataAtual}, faço a entrega dos materiais relacionados e discriminados a seguir, 
+apreendidos em decorrência de medida cautelar exarada nos autos nº ${
+      dados?.operacao?.numero_autos || "-"
+    }.
+Os materiais, arrecadados pelo(a) ${
+      dados?.cumprimento?.comandante || "-"
+    }, CPF ${
+      dados?.cumprimento?.cpf_comandante || "-"
+    }, se encontravam sob posse do(a) ${dados?.alvo?.nome || "-"}, CPF ${
+      dados?.alvo?.cpf || "-"
+    }, no endereço sito à ${dados?.alvo?.endereco || "-"}, bairro ${
+      dados?.alvo?.bairro || "-"
+    }, na cidade de ${
+      dados?.alvo?.cidade || "-"
+    }, sendo que após a apreensão foram entregues na sede do(a) ${
+      form.sede || "-"
+    }, sito à ${form.enderecoEntrega || "-"}, bairro ${
+      form.bairroEntrega || "-"
+    }, na cidade de ${
+      form.cidadeEntrega || "-"
+    }, Estado do Paraná, a(o) recebedor(a) abaixo identificado:
+`;
+
+    doc.text(texto, 15, 35, { maxWidth: 180 });
+
+    // 🔹 Tabela de materiais
     autoTable(doc, {
-      startY: 115,
-      head: [["Item nº", "Quant.", "Descrição do item"]],
-      body: itens.map((item, index) => [
-        index + 1,
-        item.quantidade || "-",
-        item.descricao || item.item_nome || "-",
-      ]),
+      startY: 120,
+      head: [["Item nº", "Quantidade", "Descrição"]],
+      body:
+        dados?.materiais?.map((item, index) => [
+          index + 1,
+          item.quantidade || "-",
+          item.descricao || "-",
+        ]) || [],
     });
 
-    doc.text(
-      `Nome completo: ${nomeRecebedor}`,
-      15,
-      doc.lastAutoTable.finalY + 20
-    );
-    doc.text(`CPF: ${cpfRecebedor}`, 15, doc.lastAutoTable.finalY + 30);
+    const yFinal = doc.lastAutoTable?.finalY || 140;
+    doc.text(`Nome completo: ${form.nomeRecebedor || "-"}`, 15, yFinal + 20);
+    doc.text(`CPF: ${form.cpfRecebedor || "-"}`, 15, yFinal + 30);
     doc.text(
       "Assinatura do Recebedor(a): ___________________________",
       15,
-      doc.lastAutoTable.finalY + 40
+      yFinal + 40
     );
 
-    doc.save("termo_de_entrega.pdf");
+    doc.save("termo_cautela.pdf");
   };
 
-  return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Termo de Entrega - Cautela</h1>
+  if (carregando) {
+    return (
+      <p className="text-center mt-10 text-gray-600">Carregando dados...</p>
+    );
+  }
 
-      {/* Pré-visualização do termo com dados do Supabase */}
-      <div className="border p-4 mb-4 bg-gray-50 text-gray-800 whitespace-pre-wrap">
-        Aos {dataAtual}, faço a entrega dos materiais relacionados e
-        discriminados a seguir, apreendidos em decorrência de medida cautelar
-        exarada nos autos nº <strong>{numeroAutos}</strong>. Os materiais,
-        arrecadados pelo(a) <strong>{comandante}</strong>, CPF{" "}
-        <strong>{cpfComandante}</strong>, se encontravam sob posse do(a){" "}
-        <strong>{nomeAlvo}</strong>, CPF <strong>{cpfAlvo}</strong>, no endereço
-        sito à <strong>{dadosAlvo.endereco}</strong>, bairro{" "}
-        <strong>{dadosAlvo.bairro}</strong>, na cidade de{" "}
-        <strong>{dadosAlvo.cidade}</strong>, sendo que após a apreensão foram
-        entregues na sede do(a){" "}
-        <strong>
-          {enderecoEntrega} / {bairroEntrega} / {cidadeEntrega}
-        </strong>
-        , Estado do Paraná, a(o) recebedor(a) abaixo identificado:
-      </div>
+  if (!dados) {
+    return (
+      <p className="text-center mt-10 text-red-600">
+        Nenhum dado encontrado. Selecione um alvo na tela anterior.
+      </p>
+    );
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto p-6 bg-white shadow rounded mt-10">
+      <h2 className="text-xl font-bold mb-4 text-center">
+        Termo de Entrega - Cautela
+      </h2>
+
+      <p className="mb-6 text-justify whitespace-pre-line">
+        Aos {formatarDataPorExtenso()}, faço a entrega dos materiais
+        relacionados e discriminados a seguir, apreendidos em decorrência de
+        medida cautelar exarada nos autos nº{" "}
+        <b>{dados?.operacao?.numero_autos || "-"}</b>. Os materiais, arrecadados
+        pelo(a) <b>{dados?.cumprimento?.comandante || "-"}</b>, CPF{" "}
+        <b>{dados?.cumprimento?.cpf_comandante || "-"}</b>, se encontravam sob
+        posse do(a) <b>{dados?.alvo?.nome || "-"}</b>, CPF{" "}
+        <b>{dados?.alvo?.cpf || "-"}</b>, no endereço sito à{" "}
+        <b>{dados?.alvo?.endereco || "-"}</b>, bairro{" "}
+        <b>{dados?.alvo?.bairro || "-"}</b>, na cidade de{" "}
+        <b>{dados?.alvo?.cidade || "-"}</b>, sendo que após a apreensão foram
+        entregues na sede do(a):
+      </p>
 
       {/* Campos editáveis */}
-      <div className="mb-4">
-        <label className="block text-sm">Endereço de entrega:</label>
+      <div className="grid grid-cols-2 gap-4 mb-6">
         <input
           type="text"
-          value={enderecoEntrega}
-          onChange={(e) => setEnderecoEntrega(e.target.value)}
-          className="border p-2 w-full"
+          placeholder="Sede"
+          value={form.sede}
+          onChange={(e) => setForm({ ...form, sede: e.target.value })}
+          className="border p-2 rounded"
         />
-        <label className="block text-sm mt-2">Bairro:</label>
         <input
           type="text"
-          value={bairroEntrega}
-          onChange={(e) => setBairroEntrega(e.target.value)}
-          className="border p-2 w-full"
+          placeholder="Endereço"
+          value={form.enderecoEntrega}
+          onChange={(e) =>
+            setForm({ ...form, enderecoEntrega: e.target.value })
+          }
+          className="border p-2 rounded"
         />
-        <label className="block text-sm mt-2">Cidade:</label>
         <input
           type="text"
-          value={cidadeEntrega}
-          onChange={(e) => setCidadeEntrega(e.target.value)}
-          className="border p-2 w-full"
+          placeholder="Bairro"
+          value={form.bairroEntrega}
+          onChange={(e) => setForm({ ...form, bairroEntrega: e.target.value })}
+          className="border p-2 rounded"
+        />
+        <input
+          type="text"
+          placeholder="Cidade"
+          value={form.cidadeEntrega}
+          onChange={(e) => setForm({ ...form, cidadeEntrega: e.target.value })}
+          className="border p-2 rounded"
+        />
+        <input
+          type="text"
+          placeholder="Nome do Recebedor"
+          value={form.nomeRecebedor}
+          onChange={(e) => setForm({ ...form, nomeRecebedor: e.target.value })}
+          className="border p-2 rounded"
+        />
+        <input
+          type="text"
+          placeholder="CPF do Recebedor"
+          value={form.cpfRecebedor}
+          onChange={(e) => setForm({ ...form, cpfRecebedor: e.target.value })}
+          className="border p-2 rounded"
         />
       </div>
 
-      <div className="mb-4">
-        <label className="block text-sm">Nome do Recebedor(a):</label>
-        <input
-          type="text"
-          value={nomeRecebedor}
-          onChange={(e) => setNomeRecebedor(e.target.value)}
-          className="border p-2 w-full"
-        />
-        <label className="block text-sm mt-2">CPF do Recebedor(a):</label>
-        <input
-          type="text"
-          value={cpfRecebedor}
-          onChange={(e) => setCpfRecebedor(e.target.value)}
-          className="border p-2 w-full"
-        />
-      </div>
+      {/* Lista de materiais */}
+      <h3 className="font-semibold mb-2">Materiais Apreendidos:</h3>
+      <table className="w-full border mb-6">
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="border p-2">Item nº</th>
+            <th className="border p-2">Quantidade</th>
+            <th className="border p-2">Descrição</th>
+          </tr>
+        </thead>
+        <tbody>
+          {dados?.materiais?.length > 0 ? (
+            dados.materiais.map((item, index) => (
+              <tr key={index}>
+                <td className="border p-2 text-center">{index + 1}</td>
+                <td className="border p-2 text-center">{item.quantidade}</td>
+                <td className="border p-2">{item.descricao}</td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan="3" className="text-center border p-2">
+                Nenhum material cadastrado.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
 
-      {/* Botão gerar PDF */}
       <button
         onClick={gerarPDF}
-        className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
+        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded w-full"
       >
         Gerar PDF
       </button>

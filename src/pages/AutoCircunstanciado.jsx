@@ -77,8 +77,12 @@ export default function AutoCircunstanciado() {
   // ✅ função para navegar para a tela de cautela
   const handleCautela = async (alvo) => {
     const itens = await fetchItens(alvo.id);
+
+    // 🔹 salva dados no localStorage
     localStorage.setItem("itensApreendidos", JSON.stringify(itens));
     localStorage.setItem("nomeAlvo", alvo.nome || "");
+    localStorage.setItem("alvoId", alvo.id); // ✅ novo campo salvo
+
     navigate("/cautela");
   };
 
