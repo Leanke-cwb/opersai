@@ -126,7 +126,7 @@ export default function Cautela() {
 
     // TÍTULO
     doc.setFontSize(12);
-    doc.text("TERMO DE ENTREGA - CAUTELA", pageWidth / 2, 50, {
+    doc.text("TERMO DE ENTREGA DE MATERIAL", pageWidth / 2, 50, {
       align: "center",
     });
 

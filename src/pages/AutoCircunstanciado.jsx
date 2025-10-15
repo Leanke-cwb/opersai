@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabase/client";
-import { useNavigate } from "react-router-dom"; // ✅ import para navegação
+import { useNavigate } from "react-router-dom";
 
 export default function AutoCircunstanciado() {
   const [operacoes, setOperacoes] = useState([]);
   const [operacaoSelecionada, setOperacaoSelecionada] = useState(null);
   const [alvos, setAlvos] = useState([]);
   const [encerramentos, setEncerramentos] = useState([]);
-  const navigate = useNavigate(); // ✅ hook de navegação
+  const navigate = useNavigate();
 
+  // Busca todas as operações
   useEffect(() => {
     async function fetchOperacoes() {
       const { data, error } = await supabase
@@ -22,6 +23,7 @@ export default function AutoCircunstanciado() {
     fetchOperacoes();
   }, []);
 
+  // Busca alvos e encerramentos ao selecionar operação
   useEffect(() => {
     if (!operacaoSelecionada) {
       setAlvos([]);
@@ -31,24 +33,27 @@ export default function AutoCircunstanciado() {
 
     async function fetchDados() {
       try {
+        // 1️⃣ Buscar alvos
         const { data: alvosData, error: alvosError } = await supabase
           .from("alvos")
-          .select("id, nome, numero_alvo")
+          .select("*")
           .eq("operacao_id", operacaoSelecionada.id);
 
         if (alvosError) throw alvosError;
         setAlvos(alvosData || []);
 
-        const { data: encerramentosData, error: encerramentosError } =
-          await supabase
+        // 2️⃣ Buscar encerramentos por alvo
+        const encerramentosData = [];
+        for (let alvo of alvosData) {
+          const { data, error } = await supabase
             .from("operacoes_encerramento")
-            .select(
-              "id, alvo_id, encerrado, houve_apreensao, encerrado_em, medidas"
-            )
-            .eq("operacao_id", operacaoSelecionada.id);
+            .select("*")
+            .eq("alvo_id", alvo.id);
 
-        if (encerramentosError) throw encerramentosError;
-        setEncerramentos(encerramentosData || []);
+          if (error) throw error;
+          encerramentosData.push(...data);
+        }
+        setEncerramentos(encerramentosData);
       } catch (err) {
         console.error("Erro ao buscar dados:", err);
       }
@@ -61,10 +66,11 @@ export default function AutoCircunstanciado() {
     return encerramentos.find((e) => e.alvo_id === alvoId) || null;
   }
 
+  // Busca itens apreendidos
   async function fetchItens(alvoId) {
     const { data, error } = await supabase
       .from("materiais_apreendidos")
-      .select("id, quantidade, descricao")
+      .select("*")
       .eq("alvo_id", alvoId);
 
     if (error) {
@@ -74,16 +80,21 @@ export default function AutoCircunstanciado() {
     return data || [];
   }
 
-  // ✅ função para navegar para a tela de cautela
+  // Botão Cautela
   const handleCautela = async (alvo) => {
     const itens = await fetchItens(alvo.id);
 
-    // 🔹 salva dados no localStorage
     localStorage.setItem("itensApreendidos", JSON.stringify(itens));
     localStorage.setItem("nomeAlvo", alvo.nome || "");
-    localStorage.setItem("alvoId", alvo.id); // ✅ novo campo salvo
+    localStorage.setItem("alvoId", alvo.id);
 
     navigate("/cautela");
+  };
+
+  // Botão Auto
+  const handleAuto = async (alvo) => {
+    localStorage.setItem("alvoId", alvo.id);
+    navigate("/auto");
   };
 
   function handleSelecionarOperacao(event) {
@@ -151,7 +162,10 @@ export default function AutoCircunstanciado() {
                       </td>
                       <td className="border border-gray-300 px-4 py-2 text-center">
                         <div className="flex flex-row flex-wrap justify-center items-center gap-2">
-                          <button className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">
+                          <button
+                            onClick={() => handleAuto(alvo)}
+                            className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                          >
                             Auto
                           </button>
                           <button className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600">
@@ -164,7 +178,6 @@ export default function AutoCircunstanciado() {
                             Custódia
                           </button>
 
-                          {/* ✅ botão Cautela agora navega */}
                           <button
                             onClick={() => handleCautela(alvo)}
                             className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600"
