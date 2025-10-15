@@ -41,7 +41,6 @@ export default function Register() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Função para reenviar e-mail de confirmação
   const reenviarEmailConfirmacao = async () => {
     try {
       const { error } = await supabase.auth.resend({ email: form.email });
@@ -87,7 +86,7 @@ export default function Register() {
         return;
       }
 
-      // 2️⃣ Verifica duplicidade na tabela 'usuarios'
+      // 2️⃣ Checa duplicidade na tabela usuarios
       const { data: existing } = await supabase
         .from("usuarios")
         .select("id")
@@ -100,10 +99,10 @@ export default function Register() {
         return;
       }
 
-      // 3️⃣ Insere dados na tabela 'usuarios' com user_id do Auth
+      // 3️⃣ Insere dados com user_id
       const { error: dbError } = await supabase.from("usuarios").insert([
         {
-          user_id: authUser.user.id, // ✅ ID do Auth
+          user_id: authUser.user.id,
           posto_graduacao: form.posto_graduacao,
           nome: form.nome,
           cpf: form.cpf,
