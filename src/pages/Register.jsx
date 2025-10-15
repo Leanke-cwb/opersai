@@ -41,20 +41,6 @@ export default function Register() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Botão para reenviar e-mail de confirmação
-  const reenviarEmailConfirmacao = async () => {
-    try {
-      const { error } = await supabase.auth.resend({ email: form.email });
-      if (error) {
-        alert("Erro ao reenviar e-mail de confirmação: " + error.message);
-        return;
-      }
-      alert("E-mail de confirmação reenviado com sucesso!");
-    } catch (err) {
-      alert("Erro inesperado: " + (err.message || "Tente novamente."));
-    }
-  };
-
   const handleRegister = async (e) => {
     e.preventDefault();
 
@@ -72,9 +58,8 @@ export default function Register() {
     setLoading(true);
 
     try {
-      // Define o redirect correto para o e-mail
-      const redirectUrl =
-        import.meta.env.VITE_SITE_URL || `${window.location.origin}/login`;
+      // Redirecionamento fixo para o site de produção
+      const redirectUrl = "https://opersai.onrender.com";
 
       // 1️⃣ Cria usuário no Auth
       const { data: authUser, error: signUpError } = await supabase.auth.signUp(
@@ -87,6 +72,12 @@ export default function Register() {
 
       if (signUpError) {
         alert("Erro no cadastro: " + signUpError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (!authUser.user) {
+        alert("Cadastro não pôde ser concluído. Verifique o e-mail informado.");
         setLoading(false);
         return;
       }
@@ -104,7 +95,7 @@ export default function Register() {
         return;
       }
 
-      // 3️⃣ Insere dados com user_id
+      // 3️⃣ Insere dados na tabela usuarios com user_id do Auth
       const { error: dbError } = await supabase.from("usuarios").insert([
         {
           user_id: authUser.user.id,
@@ -121,7 +112,10 @@ export default function Register() {
         return;
       }
 
-      alert("Cadastro realizado! Verifique seu e-mail para confirmação.");
+      alert(
+        "Cadastro realizado! Verifique seu e-mail para confirmação antes de logar."
+      );
+
       setForm({ posto_graduacao: "", nome: "", cpf: "", email: "", senha: "" });
     } catch (err) {
       alert("Erro inesperado: " + (err.message || "Tente novamente."));
@@ -205,14 +199,6 @@ export default function Register() {
         className="w-full mt-4 bg-gray-500 text-white p-2 rounded"
       >
         Voltar à Página Inicial
-      </button>
-
-      <button
-        type="button"
-        onClick={reenviarEmailConfirmacao}
-        className="w-full mt-2 bg-yellow-500 text-white p-2 rounded"
-      >
-        Reenviar e-mail de confirmação
       </button>
     </div>
   );
