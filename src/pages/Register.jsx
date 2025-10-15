@@ -58,7 +58,7 @@ export default function Register() {
     setLoading(true);
 
     try {
-      // Redirecionamento fixo para o site de produção
+      // Redirecionamento fixo para produção (sem /login)
       const redirectUrl = "https://opersai.onrender.com";
 
       // 1️⃣ Cria usuário no Auth
