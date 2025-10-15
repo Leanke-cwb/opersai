@@ -41,6 +41,20 @@ export default function Register() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Função para reenviar e-mail de confirmação
+  const reenviarEmailConfirmacao = async () => {
+    try {
+      const { error } = await supabase.auth.resend({ email: form.email });
+      if (error) {
+        alert("Erro ao reenviar e-mail de confirmação: " + error.message);
+        return;
+      }
+      alert("E-mail de confirmação reenviado com sucesso!");
+    } catch (err) {
+      alert("Erro inesperado: " + (err.message || "Tente novamente."));
+    }
+  };
+
   const handleRegister = async (e) => {
     e.preventDefault();
 
@@ -73,7 +87,7 @@ export default function Register() {
         return;
       }
 
-      // 2️⃣ Verifica duplicidade de e-mail ou CPF
+      // 2️⃣ Verifica duplicidade na tabela 'usuarios'
       const { data: existing } = await supabase
         .from("usuarios")
         .select("id")
@@ -86,9 +100,10 @@ export default function Register() {
         return;
       }
 
-      // 3️⃣ Salva dados na tabela 'usuarios' (sem enviar user_id)
+      // 3️⃣ Insere dados na tabela 'usuarios' com user_id do Auth
       const { error: dbError } = await supabase.from("usuarios").insert([
         {
+          user_id: authUser.user.id, // ✅ ID do Auth
           posto_graduacao: form.posto_graduacao,
           nome: form.nome,
           cpf: form.cpf,
@@ -186,6 +201,14 @@ export default function Register() {
         className="w-full mt-4 bg-gray-500 text-white p-2 rounded"
       >
         Voltar à Página Inicial
+      </button>
+
+      <button
+        type="button"
+        onClick={reenviarEmailConfirmacao}
+        className="w-full mt-2 bg-yellow-500 text-white p-2 rounded"
+      >
+        Reenviar e-mail de confirmação
       </button>
     </div>
   );
