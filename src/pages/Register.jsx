@@ -41,6 +41,7 @@ export default function Register() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Botão para reenviar e-mail de confirmação
   const reenviarEmailConfirmacao = async () => {
     try {
       const { error } = await supabase.auth.resend({ email: form.email });
@@ -71,12 +72,16 @@ export default function Register() {
     setLoading(true);
 
     try {
+      // Define o redirect correto para o e-mail
+      const redirectUrl =
+        import.meta.env.VITE_SITE_URL || `${window.location.origin}/login`;
+
       // 1️⃣ Cria usuário no Auth
       const { data: authUser, error: signUpError } = await supabase.auth.signUp(
         {
           email: form.email,
           password: form.senha,
-          options: { emailRedirectTo: `${window.location.origin}/login` },
+          options: { emailRedirectTo: redirectUrl },
         }
       );
 
