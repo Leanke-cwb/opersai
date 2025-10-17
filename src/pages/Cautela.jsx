@@ -17,7 +17,6 @@ export default function Cautela() {
     cpfRecebedor: "",
   });
 
-  // ======== FUNÇÃO PARA FORMATAR CPF ========
   const formatarCPF = (valor) => {
     if (!valor) return "";
     return valor
@@ -39,6 +38,7 @@ export default function Cautela() {
           return;
         }
 
+        // Busca o alvo
         const { data: alvo, error: erroAlvo } = await supabase
           .from("alvos")
           .select("*")
@@ -46,6 +46,7 @@ export default function Cautela() {
           .single();
         if (erroAlvo) throw erroAlvo;
 
+        // Busca a operação vinculada
         const { data: operacao, error: erroOp } = await supabase
           .from("operacoes")
           .select("*")
@@ -53,20 +54,27 @@ export default function Cautela() {
           .single();
         if (erroOp) throw erroOp;
 
+        // Busca o cumprimento de mandado (para obter o comandante)
+        const { data: cumprimento, error: erroCumpr } = await supabase
+          .from("cumprimento_mandado")
+          .select("comandante_nome, comandante_cpf, comandante_posto_graduacao")
+          .eq("operacao_id", alvo?.operacao_id)
+          .single();
+
+        console.log("📋 cumprimento_mandado retornado:", cumprimento);
+
+        if (erroCumpr) {
+          console.warn("⚠️ Nenhum comandante encontrado para esta operação.");
+        }
+
+        // Usar os nomes corretos das colunas
+        const comandante = cumprimento?.comandante_nome || "-";
+        const cpf_comandante = cumprimento?.comandante_cpf || "-";
+        const posto_graduacao = cumprimento?.comandante_posto_graduacao || "-";
+
+        // Itens apreendidos do localStorage
         const itensLocal = localStorage.getItem("itensApreendidos");
         const materiais = itensLocal ? JSON.parse(itensLocal) : [];
-
-        const cadastroTemp = localStorage.getItem("cadastro_temp");
-        let comandante = "-";
-        let cpf_comandante = "-";
-        let posto_graduacao = "-";
-
-        if (cadastroTemp) {
-          const dadosComandante = JSON.parse(cadastroTemp);
-          comandante = dadosComandante.nome || "-";
-          cpf_comandante = dadosComandante.cpf || "-";
-          posto_graduacao = dadosComandante.posto_graduacao || "-";
-        }
 
         setDados({
           alvo,
@@ -95,7 +103,6 @@ export default function Cautela() {
     });
   };
 
-  // ======== GERAR PDF ========
   const gerarPDF = () => {
     if (!dados) return alert("Os dados ainda não foram carregados!");
 
@@ -103,7 +110,6 @@ export default function Cautela() {
     const dataAtual = formatarDataPorExtenso();
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    // CABEÇALHO
     const logoPMPR =
       "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png";
     const logoCOGER =
@@ -124,13 +130,11 @@ export default function Cautela() {
 
     doc.line(15, 40, pageWidth - 15, 40);
 
-    // TÍTULO
     doc.setFontSize(12);
     doc.text("TERMO DE ENTREGA DE MATERIAL", pageWidth / 2, 50, {
       align: "center",
     });
 
-    // TEXTO PRINCIPAL
     doc.setFont("times", "normal");
     doc.setFontSize(11);
     const texto = `
@@ -156,21 +160,34 @@ recebedor(a) abaixo identificado:
 
     doc.text(texto, 15, 60, { maxWidth: 180, align: "justify" });
 
-    // TABELA
+    // 🔹 ALTERADO: tabela PDF com novos campos
     autoTable(doc, {
       startY: 125,
-      head: [["Item nº", "Quantidade", "Descrição"]],
+      head: [
+        [
+          "Item nº",
+          "Quantidade",
+          "Grupo",
+          "Descrição",
+          "Nº Série",
+          "Patrimônio",
+          "Observação",
+        ],
+      ],
       body:
         dados?.materiais?.map((item, index) => [
           index + 1,
           item.quantidade || "-",
+          item.item_nome || "-",
           item.descricao || "-",
+          item.numero_serie || "-",
+          item.patrimonio || "-",
+          item.observacao || "-",
         ]) || [],
-      styles: { font: "times", fontSize: 10 },
+      styles: { font: "times", fontSize: 9 },
       headStyles: { fillColor: [220, 220, 220] },
     });
 
-    // CAMPOS FINAIS
     const yFinal = doc.lastAutoTable?.finalY || 140;
     doc.text(`Nome completo: ${form.nomeRecebedor || "-"}`, 15, yFinal + 20);
     doc.text(`CPF: ${formatarCPF(form.cpfRecebedor) || "-"}`, 15, yFinal + 30);
@@ -180,7 +197,6 @@ recebedor(a) abaixo identificado:
       yFinal + 40
     );
 
-    // RODAPÉ
     doc.setFontSize(9);
     doc.text("Documento gerado eletronicamente.", pageWidth / 2, 285, {
       align: "center",
@@ -203,7 +219,6 @@ recebedor(a) abaixo identificado:
     );
   }
 
-  // ======== INTERFACE ========
   return (
     <div className="max-w-3xl mx-auto p-6 bg-white shadow rounded mt-10">
       <div className="flex justify-between items-center mb-4">
@@ -236,65 +251,18 @@ recebedor(a) abaixo identificado:
         entregues na sede do(a):
       </p>
 
-      {/* Campos editáveis */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <input
-          type="text"
-          placeholder="Unidade/Batalhão"
-          value={form.sede}
-          onChange={(e) => setForm({ ...form, sede: e.target.value })}
-          className="border p-2 rounded"
-        />
-        <input
-          type="text"
-          placeholder="Endereço"
-          value={form.enderecoEntrega}
-          onChange={(e) =>
-            setForm({ ...form, enderecoEntrega: e.target.value })
-          }
-          className="border p-2 rounded"
-        />
-        <input
-          type="text"
-          placeholder="Bairro"
-          value={form.bairroEntrega}
-          onChange={(e) => setForm({ ...form, bairroEntrega: e.target.value })}
-          className="border p-2 rounded"
-        />
-        <input
-          type="text"
-          placeholder="Cidade"
-          value={form.cidadeEntrega}
-          onChange={(e) => setForm({ ...form, cidadeEntrega: e.target.value })}
-          className="border p-2 rounded"
-        />
-        <input
-          type="text"
-          placeholder="Nome do Recebedor"
-          value={form.nomeRecebedor}
-          onChange={(e) => setForm({ ...form, nomeRecebedor: e.target.value })}
-          className="border p-2 rounded"
-        />
-        <input
-          type="text"
-          placeholder="CPF do Recebedor"
-          value={form.cpfRecebedor}
-          onChange={(e) =>
-            setForm({ ...form, cpfRecebedor: formatarCPF(e.target.value) })
-          }
-          className="border p-2 rounded"
-          maxLength={14}
-        />
-      </div>
-
-      {/* Lista de materiais */}
+      {/* 🔹 ALTERADO: tabela visual com novos campos */}
       <h3 className="font-semibold mb-2">Materiais Apreendidos:</h3>
-      <table className="w-full border mb-6">
+      <table className="w-full border mb-6 text-sm">
         <thead className="bg-gray-100">
           <tr>
             <th className="border p-2">Item nº</th>
             <th className="border p-2">Quantidade</th>
+            <th className="border p-2">Grupo</th>
             <th className="border p-2">Descrição</th>
+            <th className="border p-2">Nº Série</th>
+            <th className="border p-2">Patrimônio</th>
+            <th className="border p-2">Observação</th>
           </tr>
         </thead>
         <tbody>
@@ -303,12 +271,16 @@ recebedor(a) abaixo identificado:
               <tr key={index}>
                 <td className="border p-2 text-center">{index + 1}</td>
                 <td className="border p-2 text-center">{item.quantidade}</td>
+                <td className="border p-2">{item.item_nome}</td>
                 <td className="border p-2">{item.descricao}</td>
+                <td className="border p-2">{item.numero_serie}</td>
+                <td className="border p-2">{item.patrimonio}</td>
+                <td className="border p-2">{item.observacao}</td>
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan="3" className="text-center border p-2">
+              <td colSpan="7" className="text-center border p-2">
                 Nenhum material cadastrado.
               </td>
             </tr>

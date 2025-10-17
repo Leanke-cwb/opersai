@@ -9,13 +9,15 @@ export default function GerarAutoCircunstanciado() {
   const [operacao, setOperacao] = useState(null);
   const [encerramento, setEncerramento] = useState(null);
   const [itens, setItens] = useState([]);
+  const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
     if (!alvoId) return;
 
     async function fetchDados() {
       try {
-        // Buscar alvo
+        setCarregando(true);
+
         const { data: alvoData, error: alvoError } = await supabase
           .from("alvos")
           .select("*")
@@ -24,7 +26,6 @@ export default function GerarAutoCircunstanciado() {
         if (alvoError) throw alvoError;
         setAlvo(alvoData);
 
-        // Buscar operação
         const { data: operacaoData, error: operacaoError } = await supabase
           .from("operacoes")
           .select("*")
@@ -33,37 +34,32 @@ export default function GerarAutoCircunstanciado() {
         if (operacaoError) throw operacaoError;
         setOperacao(operacaoData);
 
-        // Buscar encerramento (mais recente)
-        const { data: encerramentoData, error: encerramentoError } =
-          await supabase
-            .from("operacoes_encerramento")
-            .select("*")
-            .eq("alvo_id", alvoId)
-            .order("created_at", { ascending: false })
-            .limit(1);
-        if (encerramentoError) throw encerramentoError;
+        const { data: encerramentoData } = await supabase
+          .from("operacoes_encerramento")
+          .select("*")
+          .eq("alvo_id", alvoId)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
         setEncerramento(encerramentoData?.[0] || null);
 
-        // Buscar itens do auto circunstanciado
         const { data: itensData, error: itensError } = await supabase
           .from("auto_itens")
-          .select(
-            `
-            *,
-            auto_circunstanciado!inner(*)
-          `
-          )
-          .eq("auto_circunstanciado.alvo_id", alvoId);
+          .select("*")
+          .eq("alvo_id", alvoId);
         if (itensError) throw itensError;
         setItens(itensData || []);
       } catch (err) {
         console.error("❌ Erro ao buscar dados:", err);
+      } finally {
+        setCarregando(false);
       }
     }
 
     fetchDados();
   }, [alvoId]);
 
+  // 🔹 APENAS ESTA FUNÇÃO FOI AJUSTADA 🔹
   async function gerarPDF() {
     const doc = new jsPDF();
     doc.setFontSize(14);
@@ -85,44 +81,68 @@ Aos ${
 CERTIFICO AINDA QUE:
 ${
   encerramento?.houve_apreensao
-    ? `- Houve a busca e dela resultou apreendido material conforme consta no Auto Circunstanciado de Busca e Apreensão anexo vinculado a este Alvo nº ${alvo?.numero_alvo}`
-    : "- Não houve apreensão."
+  // ? `- Houve a busca e dela resultou apreendido material conforme consta no Auto Circunstanciado de Busca e Apreensão anexo vinculado a este Alvo nº ${alvo?.numero_alvo}`
+  //: "- Não houve apreensão."
 }
 `;
 
     doc.text(texto, 14, 50, { maxWidth: 180 });
 
-    // Montar tabela de itens com fotos
+    // 🔸 Itens e fotos
     if (itens.length > 0) {
       let startY = 100;
+
       for (let i = 0; i < itens.length; i++) {
         const item = itens[i];
-
         doc.text(`${i + 1}`, 14, startY);
-        doc.text(`${item.quantidade || ""}`, 25, startY);
+        doc.text(`${item.quantidade_item || ""}`, 25, startY);
         doc.text(`${item.lacre || ""}`, 45, startY);
         doc.text(`${item.descricao || ""}`, 70, startY);
         doc.text(`${item.local_encontrado || ""}`, 130, startY);
 
-        if (item.foto_url) {
+        // 🔹 Novo bloco para campo "fotos" (JSON com URLs)
+        if (item.fotos) {
           try {
-            const response = await fetch(item.foto_url);
-            const blob = await response.blob();
+            const fotosArray = JSON.parse(item.fotos); // transforma o texto JSON em array
+            if (Array.isArray(fotosArray)) {
+              for (const url of fotosArray) {
+                try {
+                  const response = await fetch(url);
+                  const blob = await response.blob();
+                  const reader = new FileReader();
 
-            const reader = new FileReader();
-            reader.readAsDataURL(blob);
-            await new Promise((resolve) => {
-              reader.onloadend = () => {
-                doc.addImage(reader.result, "JPEG", 14, startY + 5, 30, 30);
-                resolve(true);
-              };
-            });
-          } catch (err) {
-            console.error("Erro ao adicionar imagem no PDF:", err);
+                  await new Promise((resolve) => {
+                    reader.onloadend = () => {
+                      doc.addImage(
+                        reader.result,
+                        "JPEG",
+                        14,
+                        startY + 5,
+                        40,
+                        30
+                      );
+                      resolve();
+                    };
+                    reader.readAsDataURL(blob);
+                  });
+
+                  startY += 35; // espaço após cada imagem
+
+                  if (startY > 250) {
+                    doc.addPage();
+                    startY = 20;
+                  }
+                } catch (err) {
+                  console.warn("Erro ao carregar imagem:", err);
+                }
+              }
+            }
+          } catch (e) {
+            console.error("Erro ao processar JSON de fotos:", e);
           }
         }
 
-        startY += 40;
+        startY += 15; // espaço entre os itens
         if (startY > 250) {
           doc.addPage();
           startY = 20;
@@ -133,12 +153,22 @@ ${
     doc.save(`AutoCircunstanciado_${alvo?.numero_alvo || "000"}.pdf`);
   }
 
-  if (!alvo || !operacao || !encerramento) return <p>Carregando dados...</p>;
+  if (carregando) {
+    return <p>Carregando dados...</p>;
+  }
+
+  if (!alvo || !operacao) {
+    return (
+      <p className="text-red-600 p-4">
+        ❌ Não foi possível carregar os dados do alvo ou operação.
+      </p>
+    );
+  }
 
   const textoAuto = `
 INVESTIGADO: ${alvo.nome}
 Aos ${
-    encerramento.encerrado_em || ""
+    encerramento?.encerrado_em || ""
   }, em cumprimento ao MANDADO DE BUSCA E APREENSÃO expedido junto aos Autos nº ${
     operacao.numero_autos
   }, da Vara ${operacao.vara} /PR, compareceu no imóvel, situado à ${
@@ -147,7 +177,7 @@ Aos ${
 
 CERTIFICO AINDA QUE:
 ${
-  encerramento.houve_apreensao
+  encerramento?.houve_apreensao
     ? `- Houve a busca e dela resultou apreendido material conforme consta no Auto Circunstanciado de Busca e Apreensão anexo vinculado a este Alvo nº ${alvo.numero_alvo}`
     : "- Não houve apreensão."
 }
@@ -175,7 +205,7 @@ ${
         {operacao.numero_autos}
       </p>
       <p>
-        <strong>Comandante:</strong> {encerramento.comandante_nome || ""}
+        <strong>Comandante:</strong> {encerramento?.comandante_nome || "—"}
       </p>
 
       <pre className="mt-6 whitespace-pre-line border p-4 bg-gray-50">
@@ -197,34 +227,51 @@ ${
               </tr>
             </thead>
             <tbody>
-              {itens.map((item, index) => (
-                <tr key={item.id}>
-                  <td className="border border-gray-300 px-2 py-1">
-                    {index + 1}
-                  </td>
-                  <td className="border border-gray-300 px-2 py-1">
-                    {item.quantidade || ""}
-                  </td>
-                  <td className="border border-gray-300 px-2 py-1">
-                    {item.lacre || ""}
-                  </td>
-                  <td className="border border-gray-300 px-2 py-1">
-                    {item.descricao || ""}
-                  </td>
-                  <td className="border border-gray-300 px-2 py-1">
-                    {item.local_encontrado || ""}
-                  </td>
-                  <td className="border border-gray-300 px-2 py-1">
-                    {item.foto_url && (
-                      <img
-                        src={item.foto_url}
-                        alt="Item"
-                        className="w-20 h-20 object-cover"
-                      />
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {itens.map((item, index) => {
+                const fotos = (() => {
+                  try {
+                    return JSON.parse(item.fotos);
+                  } catch {
+                    return [];
+                  }
+                })();
+
+                return (
+                  <tr key={item.id}>
+                    <td className="border border-gray-300 px-2 py-1">
+                      {index + 1}
+                    </td>
+                    <td className="border border-gray-300 px-2 py-1">
+                      {item.quantidade_item || ""}
+                    </td>
+                    <td className="border border-gray-300 px-2 py-1">
+                      {item.lacre || ""}
+                    </td>
+                    <td className="border border-gray-300 px-2 py-1">
+                      {item.descricao || ""}
+                    </td>
+                    <td className="border border-gray-300 px-2 py-1">
+                      {item.local_encontrado || ""}
+                    </td>
+                    <td className="border border-gray-300 px-2 py-1">
+                      {fotos.length > 0 ? (
+                        <div className="flex gap-1 flex-wrap">
+                          {fotos.map((url, idx) => (
+                            <img
+                              key={idx}
+                              src={url}
+                              alt="Foto"
+                              className="w-20 h-20 object-cover"
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
