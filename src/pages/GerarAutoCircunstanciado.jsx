@@ -9,6 +9,7 @@ export default function GerarAutoCircunstanciado() {
   const [operacao, setOperacao] = useState(null);
   const [encerramento, setEncerramento] = useState(null);
   const [itens, setItens] = useState([]);
+  const [comandante, setComandante] = useState(null);
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
@@ -18,36 +19,68 @@ export default function GerarAutoCircunstanciado() {
       try {
         setCarregando(true);
 
+        console.log("🔹 Alvo ID: –", alvoId);
+
+        // Alvo
         const { data: alvoData, error: alvoError } = await supabase
           .from("alvos")
           .select("*")
           .eq("id", alvoId)
-          .single();
-        if (alvoError) throw alvoError;
+          .maybeSingle();
+        console.log("🔹 Alvo Data:", alvoData, "Erro:", alvoError);
         setAlvo(alvoData);
 
+        // Operação
         const { data: operacaoData, error: operacaoError } = await supabase
           .from("operacoes")
           .select("*")
-          .eq("id", alvoData.operacao_id)
-          .single();
-        if (operacaoError) throw operacaoError;
+          .eq("id", alvoData?.operacao_id)
+          .maybeSingle();
+        console.log("🔹 Operação Data:", operacaoData, "Erro:", operacaoError);
         setOperacao(operacaoData);
 
-        const { data: encerramentoData } = await supabase
-          .from("operacoes_encerramento")
-          .select("*")
-          .eq("alvo_id", alvoId)
-          .order("created_at", { ascending: false })
-          .limit(1);
-
+        // Encerramento
+        const { data: encerramentoData, error: encerramentoError } =
+          await supabase
+            .from("operacoes_encerramento")
+            .select("*")
+            .eq("alvo_id", alvoId)
+            .eq("encerrado", true)
+            .order("encerrado_em", { ascending: false })
+            .limit(1);
+        console.log(
+          "🔹 Encerramento Data:",
+          encerramentoData,
+          "Erro:",
+          encerramentoError
+        );
         setEncerramento(encerramentoData?.[0] || null);
 
+        // Comandante
+        const { data: comandanteData, error: comandanteError } = await supabase
+          .from("cumprimento_mandado")
+          .select("comandante_nome, comandante_posto_graduacao")
+          .eq("alvo_id", alvoId)
+          .maybeSingle();
+        console.log(
+          "🔹 Comandante Data:",
+          comandanteData,
+          "Erro:",
+          comandanteError
+        );
+        setComandante(
+          comandanteData || {
+            comandante_nome: "—",
+            comandante_posto_graduacao: "—",
+          }
+        );
+
+        // Itens
         const { data: itensData, error: itensError } = await supabase
           .from("auto_itens")
           .select("*")
           .eq("alvo_id", alvoId);
-        if (itensError) throw itensError;
+        console.log("🔹 Itens Data:", itensData, "Erro:", itensError);
         setItens(itensData || []);
       } catch (err) {
         console.error("❌ Erro ao buscar dados:", err);
@@ -59,7 +92,6 @@ export default function GerarAutoCircunstanciado() {
     fetchDados();
   }, [alvoId]);
 
-  // 🔹 APENAS ESTA FUNÇÃO FOI AJUSTADA 🔹
   async function gerarPDF() {
     const doc = new jsPDF();
     doc.setFontSize(14);
@@ -68,107 +100,84 @@ export default function GerarAutoCircunstanciado() {
     doc.setFontSize(12);
     doc.text(`OPERAÇÃO: ${operacao?.nome_operacao || ""}`, 14, 30);
     doc.text(`ALVO Nº: ${alvo?.numero_alvo || ""}`, 14, 40);
+    doc.text(
+      `COMANDANTE: ${comandante?.comandante_nome || "—"} - ${
+        comandante?.comandante_posto_graduacao || "—"
+      }`,
+      14,
+      50
+    );
+
+    const dataCumprimento = encerramento?.encerrado_em
+      ? new Date(encerramento.encerrado_em).toLocaleString("pt-BR")
+      : "—";
+
+    const justificativaTexto = encerramento?.justificativa?.trim() || "—";
 
     const texto = `INVESTIGADO: ${alvo?.nome || ""}
-Aos ${
-      encerramento?.encerrado_em || ""
-    }, em cumprimento ao MANDADO DE BUSCA E APREENSÃO expedido junto aos Autos nº ${
+Aos ${dataCumprimento}, em cumprimento ao MANDADO DE BUSCA E APREENSÃO expedido junto aos Autos nº ${
       operacao?.numero_autos || ""
     }, da Vara ${operacao?.vara || ""} /PR, compareceu no imóvel, situado à ${
       alvo?.endereco || ""
     }, ${alvo?.cidade || ""}, na presença das testemunhas.
 
 CERTIFICO AINDA QUE:
-${
-  encerramento?.houve_apreensao
-  // ? `- Houve a busca e dela resultou apreendido material conforme consta no Auto Circunstanciado de Busca e Apreensão anexo vinculado a este Alvo nº ${alvo?.numero_alvo}`
-  //: "- Não houve apreensão."
-}
+${justificativaTexto}
 `;
 
-    doc.text(texto, 14, 50, { maxWidth: 180 });
+    doc.text(texto, 14, 60, { maxWidth: 180 });
 
-    // 🔸 Itens e fotos
+    // Tabela de itens
     if (itens.length > 0) {
-      let startY = 100;
+      let startY = 120;
+      doc.text("Itens Apreendidos:", 14, startY);
+      startY += 10;
 
-      for (let i = 0; i < itens.length; i++) {
-        const item = itens[i];
-        doc.text(`${i + 1}`, 14, startY);
-        doc.text(`${item.quantidade_item || ""}`, 25, startY);
-        doc.text(`${item.lacre || ""}`, 45, startY);
-        doc.text(`${item.descricao || ""}`, 70, startY);
-        doc.text(`${item.local_encontrado || ""}`, 130, startY);
-
-        // 🔹 Novo bloco para campo "fotos" (JSON com URLs)
-        if (item.fotos) {
-          try {
-            const fotosArray = JSON.parse(item.fotos); // transforma o texto JSON em array
-            if (Array.isArray(fotosArray)) {
-              for (const url of fotosArray) {
-                try {
-                  const response = await fetch(url);
-                  const blob = await response.blob();
-                  const reader = new FileReader();
-
-                  await new Promise((resolve) => {
-                    reader.onloadend = () => {
-                      doc.addImage(
-                        reader.result,
-                        "JPEG",
-                        14,
-                        startY + 5,
-                        40,
-                        30
-                      );
-                      resolve();
-                    };
-                    reader.readAsDataURL(blob);
-                  });
-
-                  startY += 35; // espaço após cada imagem
-
-                  if (startY > 250) {
-                    doc.addPage();
-                    startY = 20;
-                  }
-                } catch (err) {
-                  console.warn("Erro ao carregar imagem:", err);
-                }
-              }
+      autoTable(doc, {
+        startY,
+        head: [
+          ["Item nº", "Quantidade", "Lacre nº", "Descrição", "Local", "Fotos"],
+        ],
+        body: itens.map((item, index) => {
+          const fotos = (() => {
+            try {
+              return JSON.parse(item.fotos);
+            } catch {
+              return [];
             }
-          } catch (e) {
-            console.error("Erro ao processar JSON de fotos:", e);
-          }
-        }
-
-        startY += 15; // espaço entre os itens
-        if (startY > 250) {
-          doc.addPage();
-          startY = 20;
-        }
-      }
+          })();
+          return [
+            index + 1,
+            item.quantidade_item || "",
+            item.lacre || "",
+            item.descricao || "",
+            item.local_encontrado || "",
+            fotos.length > 0 ? "—" : "—",
+          ];
+        }),
+        theme: "grid",
+        headStyles: { fillColor: [200, 200, 200] },
+        margin: { left: 14, right: 14 },
+      });
     }
 
     doc.save(`AutoCircunstanciado_${alvo?.numero_alvo || "000"}.pdf`);
   }
 
-  if (carregando) {
-    return <p>Carregando dados...</p>;
-  }
-
-  if (!alvo || !operacao) {
+  if (carregando) return <p>Carregando dados...</p>;
+  if (!alvo || !operacao)
     return (
       <p className="text-red-600 p-4">
         ❌ Não foi possível carregar os dados do alvo ou operação.
       </p>
     );
-  }
 
   const textoAuto = `
 INVESTIGADO: ${alvo.nome}
 Aos ${
-    encerramento?.encerrado_em || ""
+    encerramento?.encerrado_em
+      ? new Date(encerramento.encerrado_em).toLocaleString("pt-BR")
+      : "—"
   }, em cumprimento ao MANDADO DE BUSCA E APREENSÃO expedido junto aos Autos nº ${
     operacao.numero_autos
   }, da Vara ${operacao.vara} /PR, compareceu no imóvel, situado à ${
@@ -176,11 +185,7 @@ Aos ${
   }, ${alvo.cidade}, na presença das testemunhas.
 
 CERTIFICO AINDA QUE:
-${
-  encerramento?.houve_apreensao
-    ? `- Houve a busca e dela resultou apreendido material conforme consta no Auto Circunstanciado de Busca e Apreensão anexo vinculado a este Alvo nº ${alvo.numero_alvo}`
-    : "- Não houve apreensão."
-}
+${encerramento?.justificativa?.trim() || "—"}
 `;
 
   return (
@@ -205,7 +210,15 @@ ${
         {operacao.numero_autos}
       </p>
       <p>
-        <strong>Comandante:</strong> {encerramento?.comandante_nome || "—"}
+        <strong>Comandante:</strong> {comandante?.comandante_nome || "—"} -{" "}
+        <strong>Posto/Graduação:</strong>{" "}
+        {comandante?.comandante_posto_graduacao || "—"}
+      </p>
+      <p>
+        <strong>Data do Cumprimento:</strong>{" "}
+        {encerramento?.encerrado_em
+          ? new Date(encerramento.encerrado_em).toLocaleString("pt-BR")
+          : "—"}
       </p>
 
       <pre className="mt-6 whitespace-pre-line border p-4 bg-gray-50">
@@ -223,7 +236,7 @@ ${
                 <th className="border border-gray-300 px-2 py-1">Lacre nº</th>
                 <th className="border border-gray-300 px-2 py-1">Descrição</th>
                 <th className="border border-gray-300 px-2 py-1">Local</th>
-                <th className="border border-gray-300 px-2 py-1">Foto</th>
+                <th className="border border-gray-300 px-2 py-1">Fotos</th>
               </tr>
             </thead>
             <tbody>
@@ -235,7 +248,6 @@ ${
                     return [];
                   }
                 })();
-
                 return (
                   <tr key={item.id}>
                     <td className="border border-gray-300 px-2 py-1">
@@ -278,8 +290,8 @@ ${
       )}
 
       <button
+        className="mt-6 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
         onClick={gerarPDF}
-        className="bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 mt-4"
       >
         Gerar PDF
       </button>

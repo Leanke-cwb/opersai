@@ -38,7 +38,6 @@ export default function Cautela() {
           return;
         }
 
-        // Busca o alvo
         const { data: alvo, error: erroAlvo } = await supabase
           .from("alvos")
           .select("*")
@@ -46,7 +45,6 @@ export default function Cautela() {
           .single();
         if (erroAlvo) throw erroAlvo;
 
-        // Busca a operação vinculada
         const { data: operacao, error: erroOp } = await supabase
           .from("operacoes")
           .select("*")
@@ -54,25 +52,20 @@ export default function Cautela() {
           .single();
         if (erroOp) throw erroOp;
 
-        // Busca o cumprimento de mandado (para obter o comandante)
         const { data: cumprimento, error: erroCumpr } = await supabase
           .from("cumprimento_mandado")
           .select("comandante_nome, comandante_cpf, comandante_posto_graduacao")
           .eq("operacao_id", alvo?.operacao_id)
           .single();
 
-        console.log("📋 cumprimento_mandado retornado:", cumprimento);
-
         if (erroCumpr) {
           console.warn("⚠️ Nenhum comandante encontrado para esta operação.");
         }
 
-        // Usar os nomes corretos das colunas
         const comandante = cumprimento?.comandante_nome || "-";
         const cpf_comandante = cumprimento?.comandante_cpf || "-";
         const posto_graduacao = cumprimento?.comandante_posto_graduacao || "-";
 
-        // Itens apreendidos do localStorage
         const itensLocal = localStorage.getItem("itensApreendidos");
         const materiais = itensLocal ? JSON.parse(itensLocal) : [];
 
@@ -109,12 +102,14 @@ export default function Cautela() {
     const doc = new jsPDF();
     const dataAtual = formatarDataPorExtenso();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
 
     const logoPMPR =
       "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png";
     const logoCOGER =
       "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/coger.png";
 
+    // Cabeçalho
     doc.addImage(logoPMPR, "PNG", 15, 10, 25, 25);
     doc.addImage(logoCOGER, "PNG", pageWidth - 40, 10, 25, 25);
 
@@ -130,15 +125,17 @@ export default function Cautela() {
 
     doc.line(15, 40, pageWidth - 15, 40);
 
+    // Título
     doc.setFontSize(12);
     doc.text("TERMO DE ENTREGA DE MATERIAL", pageWidth / 2, 50, {
       align: "center",
     });
 
+    // Texto justificado com recuo de parágrafo
     doc.setFont("times", "normal");
-    doc.setFontSize(11);
-    const texto = `
-Aos ${dataAtual}, faço a entrega dos materiais relacionados e discriminados a seguir,
+    doc.setFontSize(12);
+
+    const texto = `Aos ${dataAtual}, faço a entrega dos materiais relacionados e discriminados a seguir,
 apreendidos em decorrência de medida cautelar exarada nos autos nº ${
       dados?.operacao?.numero_autos || "-"
     }.
@@ -154,15 +151,44 @@ Os materiais, arrecadados pelo(a) ${dados?.posto_graduacao || ""} ${
       form.sede || "-"
     }, sito à ${form.enderecoEntrega || "-"}, bairro ${
       form.bairroEntrega || "-"
-    }, na cidade de ${form.cidadeEntrega || "-"}, Estado do Paraná, a(o)
-recebedor(a) abaixo identificado:
-`;
+    }, na cidade de ${
+      form.cidadeEntrega || "-"
+    }, Estado do Paraná, a(o) recebedor(a) abaixo identificado:`;
 
-    doc.text(texto, 15, 60, { maxWidth: 180, align: "justify" });
+    const marginLeft = 15;
+    const marginRight = 15;
+    const indent = 10; // recuo de parágrafo
+    const maxWidth = pageWidth - marginLeft - marginRight;
+    let currentY = 60;
+    const lineHeight = 7;
 
-    // 🔹 ALTERADO: tabela PDF com novos campos
+    const linhas = doc.splitTextToSize(texto, maxWidth - indent);
+
+    linhas.forEach((linha, idx) => {
+      const isFirstLine = idx === 0; // aplica recuo somente na primeira linha
+      const isLastLine = idx === linhas.length - 1;
+      const words = linha.split(" ");
+      const lineWidth = doc.getTextWidth(linha);
+      const spaceCount = words.length - 1;
+      const extraSpace = maxWidth - lineWidth;
+      const spacing =
+        isLastLine || spaceCount === 0 ? 0 : extraSpace / spaceCount;
+
+      let cursorX = marginLeft + (isFirstLine ? indent : 0);
+      words.forEach((word) => {
+        doc.text(word, cursorX, currentY);
+        const wordWidth = doc.getTextWidth(word);
+        cursorX += wordWidth + doc.getTextWidth(" ") + spacing;
+      });
+
+      currentY += lineHeight;
+    });
+
+    // Tabela
+    const tabelaStartY = currentY + 6;
+
     autoTable(doc, {
-      startY: 125,
+      startY: tabelaStartY,
       head: [
         [
           "Item nº",
@@ -184,23 +210,47 @@ recebedor(a) abaixo identificado:
           item.patrimonio || "-",
           item.observacao || "-",
         ]) || [],
-      styles: { font: "times", fontSize: 9 },
+      styles: {
+        font: "times",
+        fontSize: 9,
+        cellPadding: 3,
+        lineHeight: 1.35,
+      },
       headStyles: { fillColor: [220, 220, 220] },
+      theme: "grid",
+      margin: { left: 15, right: 15 },
     });
 
-    const yFinal = doc.lastAutoTable?.finalY || 140;
-    doc.text(`Nome completo: ${form.nomeRecebedor || "-"}`, 15, yFinal + 20);
-    doc.text(`CPF: ${formatarCPF(form.cpfRecebedor) || "-"}`, 15, yFinal + 30);
+    // Dados do recebedor
+    const yFinal = doc.lastAutoTable?.finalY || tabelaStartY + 50;
+    const gapAfterTable = 16;
+    doc.setFontSize(11);
+    doc.text(
+      `Nome completo: ${form.nomeRecebedor || "-"}`,
+      15,
+      yFinal + gapAfterTable
+    );
+    doc.text(
+      `CPF: ${formatarCPF(form.cpfRecebedor) || "-"}`,
+      15,
+      yFinal + gapAfterTable + 10
+    );
     doc.text(
       "Assinatura do Recebedor(a): ___________________________",
       15,
-      yFinal + 40
+      yFinal + gapAfterTable + 20
     );
 
+    // Rodapé
     doc.setFontSize(9);
-    doc.text("Documento gerado eletronicamente.", pageWidth / 2, 285, {
-      align: "center",
-    });
+    doc.text(
+      "Documento gerado eletronicamente.",
+      pageWidth / 2,
+      pageHeight - 10,
+      {
+        align: "center",
+      }
+    );
 
     doc.save("termo_cautela.pdf");
   };
@@ -251,7 +301,84 @@ recebedor(a) abaixo identificado:
         entregues na sede do(a):
       </p>
 
-      {/* 🔹 ALTERADO: tabela visual com novos campos */}
+      {/* 🔹 CAMPOS DE DESTINO E RECEBEDOR */}
+      <div className="mb-6 space-y-3">
+        <label className="block">
+          <span className="font-semibold">Sede:</span>
+          <input
+            type="text"
+            className="border p-2 rounded w-full"
+            value={form.sede}
+            onChange={(e) => setForm({ ...form, sede: e.target.value })}
+            placeholder="Ex: 1ª CIPM / COGER"
+          />
+        </label>
+
+        <label className="block">
+          <span className="font-semibold">Endereço de entrega:</span>
+          <input
+            type="text"
+            className="border p-2 rounded w-full"
+            value={form.enderecoEntrega}
+            onChange={(e) =>
+              setForm({ ...form, enderecoEntrega: e.target.value })
+            }
+          />
+        </label>
+
+        <div className="grid grid-cols-3 gap-3">
+          <label>
+            <span className="font-semibold">Bairro:</span>
+            <input
+              type="text"
+              className="border p-2 rounded w-full"
+              value={form.bairroEntrega}
+              onChange={(e) =>
+                setForm({ ...form, bairroEntrega: e.target.value })
+              }
+            />
+          </label>
+
+          <label className="col-span-2">
+            <span className="font-semibold">Cidade:</span>
+            <input
+              type="text"
+              className="border p-2 rounded w-full"
+              value={form.cidadeEntrega}
+              onChange={(e) =>
+                setForm({ ...form, cidadeEntrega: e.target.value })
+              }
+            />
+          </label>
+        </div>
+
+        <h3 className="mt-4 font-semibold">Dados do Recebedor:</h3>
+        <label className="block">
+          <span className="font-semibold">Nome completo:</span>
+          <input
+            type="text"
+            className="border p-2 rounded w-full"
+            value={form.nomeRecebedor}
+            onChange={(e) =>
+              setForm({ ...form, nomeRecebedor: e.target.value })
+            }
+          />
+        </label>
+
+        <label className="block">
+          <span className="font-semibold">CPF do Recebedor:</span>
+          <input
+            type="text"
+            className="border p-2 rounded w-full"
+            value={form.cpfRecebedor}
+            onChange={(e) =>
+              setForm({ ...form, cpfRecebedor: formatarCPF(e.target.value) })
+            }
+            maxLength={14}
+          />
+        </label>
+      </div>
+
       <h3 className="font-semibold mb-2">Materiais Apreendidos:</h3>
       <table className="w-full border mb-6 text-sm">
         <thead className="bg-gray-100">
