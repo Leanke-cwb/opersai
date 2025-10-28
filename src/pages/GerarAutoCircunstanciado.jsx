@@ -3,8 +3,15 @@ import { supabase } from "../supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+function cleanUUID(uuidString) {
+  if (!uuidString) return null;
+  return uuidString.replace(/"/g, "");
+}
+
 export default function GerarAutoCircunstanciado() {
-  const alvoId = localStorage.getItem("alvoId");
+  const alvoIdRaw = localStorage.getItem("alvoId");
+  const alvoId = cleanUUID(alvoIdRaw);
+
   const [alvo, setAlvo] = useState(null);
   const [operacao, setOperacao] = useState(null);
   const [encerramento, setEncerramento] = useState(null);
@@ -14,32 +21,25 @@ export default function GerarAutoCircunstanciado() {
 
   useEffect(() => {
     if (!alvoId) return;
-
     async function fetchDados() {
       try {
         setCarregando(true);
-
-        console.log("🔹 Alvo ID: –", alvoId);
-
-        // Alvo
         const { data: alvoData, error: alvoError } = await supabase
           .from("alvos")
           .select("*")
           .eq("id", alvoId)
           .maybeSingle();
-        console.log("🔹 Alvo Data:", alvoData, "Erro:", alvoError);
+        if (alvoError) throw alvoError;
         setAlvo(alvoData);
 
-        // Operação
         const { data: operacaoData, error: operacaoError } = await supabase
           .from("operacoes")
           .select("*")
           .eq("id", alvoData?.operacao_id)
           .maybeSingle();
-        console.log("🔹 Operação Data:", operacaoData, "Erro:", operacaoError);
+        if (operacaoError) throw operacaoError;
         setOperacao(operacaoData);
 
-        // Encerramento
         const { data: encerramentoData, error: encerramentoError } =
           await supabase
             .from("operacoes_encerramento")
@@ -47,27 +47,17 @@ export default function GerarAutoCircunstanciado() {
             .eq("alvo_id", alvoId)
             .eq("encerrado", true)
             .order("encerrado_em", { ascending: false })
-            .limit(1);
-        console.log(
-          "🔹 Encerramento Data:",
-          encerramentoData,
-          "Erro:",
-          encerramentoError
-        );
-        setEncerramento(encerramentoData?.[0] || null);
+            .limit(1)
+            .maybeSingle();
+        if (encerramentoError) throw encerramentoError;
+        setEncerramento(encerramentoData || null);
 
-        // Comandante
         const { data: comandanteData, error: comandanteError } = await supabase
           .from("cumprimento_mandado")
           .select("comandante_nome, comandante_posto_graduacao")
           .eq("alvo_id", alvoId)
           .maybeSingle();
-        console.log(
-          "🔹 Comandante Data:",
-          comandanteData,
-          "Erro:",
-          comandanteError
-        );
+        if (comandanteError) throw comandanteError;
         setComandante(
           comandanteData || {
             comandante_nome: "—",
@@ -75,90 +65,217 @@ export default function GerarAutoCircunstanciado() {
           }
         );
 
-        // Itens
         const { data: itensData, error: itensError } = await supabase
           .from("auto_itens")
           .select("*")
           .eq("alvo_id", alvoId);
-        console.log("🔹 Itens Data:", itensData, "Erro:", itensError);
-        setItens(itensData || []);
-      } catch (err) {
-        console.error("❌ Erro ao buscar dados:", err);
+        if (itensError) throw itensError;
+
+        const itensComUrls = await Promise.all(
+          (itensData || []).map(async (item) => {
+            let fotos = [];
+            if (item.fotos) {
+              if (Array.isArray(item.fotos)) fotos = item.fotos;
+              else if (typeof item.fotos === "string") {
+                try {
+                  fotos = JSON.parse(item.fotos);
+                  if (!Array.isArray(fotos)) fotos = [fotos];
+                } catch {
+                  fotos = item.fotos.split(",").map((f) => f.trim());
+                }
+              }
+            }
+            const signedFotos = await Promise.all(
+              fotos.map(async (fileName) => {
+                try {
+                  const { data, error } = await supabase.storage
+                    .from("auto_itens_fotos")
+                    .createSignedUrl(fileName, 31536000);
+                  if (error) return null;
+                  return data.signedUrl;
+                } catch {
+                  return null;
+                }
+              })
+            );
+            return { ...item, signedFotos: signedFotos.filter(Boolean) };
+          })
+        );
+        setItens(itensComUrls);
+      } catch (error) {
+        console.error("❌ Erro ao buscar dados:", error);
       } finally {
         setCarregando(false);
       }
     }
-
     fetchDados();
   }, [alvoId]);
 
   async function gerarPDF() {
     const doc = new jsPDF();
-    doc.setFontSize(14);
-    doc.text("AUTO CIRCUNSTANCIADO DE BUSCA e APREENSÃO", 14, 20);
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const tableMargin = 14;
+    const photoPadding = 2;
+    const photoHeight = 35;
+    const logoPMPR =
+      "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png";
+    const logoCOGER =
+      "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/coger.png";
+
+    doc.addImage(logoPMPR, "PNG", 15, 10, 25, 25);
+    doc.addImage(logoCOGER, "PNG", pageWidth - 40, 10, 25, 25);
+
+    doc.setFont("times", "bold");
+    doc.setFontSize(13);
+    doc.text("POLÍCIA MILITAR DO PARANÁ", pageWidth / 2, 20, {
+      align: "center",
+    });
+    doc.text("CORREGEDORIA-GERAL", pageWidth / 2, 27, { align: "center" });
+    doc.text("SEÇÃO DE ASSUNTOS INTERNOS", pageWidth / 2, 34, {
+      align: "center",
+    });
+    doc.line(15, 40, pageWidth - 15, 40);
 
     doc.setFontSize(12);
-    doc.text(`OPERAÇÃO: ${operacao?.nome_operacao || ""}`, 14, 30);
-    doc.text(`ALVO Nº: ${alvo?.numero_alvo || ""}`, 14, 40);
+    doc.text("AUTO CIRCUNSTANCIADO DE BUSCA E APREENSÃO", pageWidth / 2, 50, {
+      align: "center",
+    });
+
+    let yPos = 60;
+    doc.setFont("times", "normal");
+    doc.setFontSize(11);
+    doc.text(`OPERAÇÃO: ${operacao?.nome_operacao || "—"}`, 14, yPos);
+    yPos += 7;
+    doc.text(`ALVO Nº: ${alvo?.numero_alvo || "—"}`, 14, yPos);
+    yPos += 7;
     doc.text(
       `COMANDANTE: ${comandante?.comandante_nome || "—"} - ${
         comandante?.comandante_posto_graduacao || "—"
       }`,
       14,
-      50
+      yPos
     );
+    yPos += 10;
 
     const dataCumprimento = encerramento?.encerrado_em
       ? new Date(encerramento.encerrado_em).toLocaleString("pt-BR")
       : "—";
-
     const justificativaTexto = encerramento?.justificativa?.trim() || "—";
 
-    const texto = `INVESTIGADO: ${alvo?.nome || ""}
+    const texto = `INVESTIGADO: ${alvo?.nome || "—"}
 Aos ${dataCumprimento}, em cumprimento ao MANDADO DE BUSCA E APREENSÃO expedido junto aos Autos nº ${
-      operacao?.numero_autos || ""
-    }, da Vara ${operacao?.vara || ""} /PR, compareceu no imóvel, situado à ${
-      alvo?.endereco || ""
-    }, ${alvo?.cidade || ""}, na presença das testemunhas.
+      operacao?.numero_autos || "—"
+    }, da Vara ${operacao?.vara || "—"} /PR, compareceu no imóvel, situado à ${
+      alvo?.endereco || "—"
+    }, ${alvo?.cidade || "—"}, na presença das testemunhas.
 
 CERTIFICO AINDA QUE:
 ${justificativaTexto}
 `;
+    doc.text(texto, 14, yPos, { maxWidth: pageWidth - 28 });
 
-    doc.text(texto, 14, 60, { maxWidth: 180 });
-
-    // Tabela de itens
     if (itens.length > 0) {
-      let startY = 120;
+      let startY = yPos + 50;
       doc.text("Itens Apreendidos:", 14, startY);
-      startY += 10;
+      startY += 8;
+
+      const itensComBase64 = await Promise.all(
+        itens.map(async (item) => {
+          const base64Fotos = await Promise.all(
+            (item.signedFotos || []).map(async (url) => {
+              try {
+                const blob = await fetch(url).then((res) => res.blob());
+                return await new Promise((resolve) => {
+                  const reader = new FileReader();
+                  reader.onload = () => resolve(reader.result);
+                  reader.readAsDataURL(blob);
+                });
+              } catch {
+                return null;
+              }
+            })
+          );
+          return { ...item, base64Fotos: base64Fotos.filter(Boolean) };
+        })
+      );
 
       autoTable(doc, {
         startY,
         head: [
           ["Item nº", "Quantidade", "Lacre nº", "Descrição", "Local", "Fotos"],
         ],
-        body: itens.map((item, index) => {
-          const fotos = (() => {
-            try {
-              return JSON.parse(item.fotos);
-            } catch {
-              return [];
-            }
-          })();
-          return [
-            index + 1,
-            item.quantidade_item || "",
-            item.lacre || "",
-            item.descricao || "",
-            item.local_encontrado || "",
-            fotos.length > 0 ? "—" : "—",
-          ];
-        }),
+        body: itensComBase64.map((item, i) => [
+          i + 1,
+          item.quantidade_item || "",
+          item.lacre || "",
+          item.descricao || "",
+          item.local_encontrado || "",
+          item.base64Fotos.length > 0 ? "" : "—",
+        ]),
         theme: "grid",
-        headStyles: { fillColor: [200, 200, 200] },
-        margin: { left: 14, right: 14 },
+        headStyles: { fillColor: [230, 230, 230] },
+        margin: { left: tableMargin, right: tableMargin },
+        columnStyles: {
+          3: { cellWidth: 40 },
+          5: { cellWidth: 55 },
+        },
+        rowPageBreak: "avoid",
+        didParseCell: (data) => {
+          if (data.section === "body" && data.column.index === 5) {
+            const photoPadding = 2;
+            const photoHeight = 35;
+            if (data.row.height < photoHeight + 2 * photoPadding) {
+              data.row.height = photoHeight + 2 * photoPadding;
+            }
+          }
+        },
+        didDrawCell: (data) => {
+          if (data.section === "body" && data.column.index === 5) {
+            const item = itensComBase64[data.row.index];
+            const cellX = data.cell.x;
+            const cellY = data.cell.y;
+            const cellWidth = data.cell.width;
+            const cellHeight = data.row.height;
+
+            if (!item.base64Fotos?.length) return;
+
+            const photoPadding = 2;
+            const photoHeight = 35;
+            const photos = item.base64Fotos.slice(0, 2);
+            const photoAvailableWidth =
+              cellWidth - photoPadding * (photos.length + 1);
+            const photoWidthAdjusted = photoAvailableWidth / photos.length;
+
+            photos.forEach((img, idx) => {
+              const x =
+                cellX +
+                photoPadding +
+                idx * (photoWidthAdjusted + photoPadding);
+              const y = cellY + photoPadding;
+              doc.addImage(img, "JPEG", x, y, photoWidthAdjusted, photoHeight);
+            });
+
+            if (item.base64Fotos.length > 2) {
+              const more = `+${item.base64Fotos.length - 2} mais`;
+              doc.setFontSize(8);
+              doc.setTextColor(100);
+              doc.text(more, cellX + photoPadding, cellY + cellHeight - 3);
+              doc.setFontSize(11);
+              doc.setTextColor(0);
+            }
+          }
+        },
       });
+
+      // Posição para texto abaixo da tabela
+      let finalY = doc.lastAutoTable.finalY || startY + 20;
+      const totalItens = itens.length;
+      const pluralItem = totalItens === 1 ? "item" : "itens";
+      const textoResumo = `E sendo o que havia para relacionar, totalizando a arrecadação de ${totalItens} ${pluralItem}, deu-se por encerrada a presente busca.`;
+
+      doc.setFontSize(11);
+      doc.setFont("times", "normal");
+      doc.text(textoResumo, 14, finalY + 10);
     }
 
     doc.save(`AutoCircunstanciado_${alvo?.numero_alvo || "000"}.pdf`);
@@ -172,8 +289,7 @@ ${justificativaTexto}
       </p>
     );
 
-  const textoAuto = `
-INVESTIGADO: ${alvo.nome}
+  const textoAuto = `INVESTIGADO: ${alvo.nome}
 Aos ${
     encerramento?.encerrado_em
       ? new Date(encerramento.encerrado_em).toLocaleString("pt-BR")
@@ -193,7 +309,6 @@ ${encerramento?.justificativa?.trim() || "—"}
       <h1 className="text-2xl mb-6 font-bold">
         AUTO CIRCUNSTANCIADO DE BUSCA e APREENSÃO
       </h1>
-
       <p>
         <strong>Operação:</strong> {operacao.nome_operacao}
       </p>
@@ -220,7 +335,6 @@ ${encerramento?.justificativa?.trim() || "—"}
           ? new Date(encerramento.encerrado_em).toLocaleString("pt-BR")
           : "—"}
       </p>
-
       <pre className="mt-6 whitespace-pre-line border p-4 bg-gray-50">
         {textoAuto}
       </pre>
@@ -240,50 +354,41 @@ ${encerramento?.justificativa?.trim() || "—"}
               </tr>
             </thead>
             <tbody>
-              {itens.map((item, index) => {
-                const fotos = (() => {
-                  try {
-                    return JSON.parse(item.fotos);
-                  } catch {
-                    return [];
-                  }
-                })();
-                return (
-                  <tr key={item.id}>
-                    <td className="border border-gray-300 px-2 py-1">
-                      {index + 1}
-                    </td>
-                    <td className="border border-gray-300 px-2 py-1">
-                      {item.quantidade_item || ""}
-                    </td>
-                    <td className="border border-gray-300 px-2 py-1">
-                      {item.lacre || ""}
-                    </td>
-                    <td className="border border-gray-300 px-2 py-1">
-                      {item.descricao || ""}
-                    </td>
-                    <td className="border border-gray-300 px-2 py-1">
-                      {item.local_encontrado || ""}
-                    </td>
-                    <td className="border border-gray-300 px-2 py-1">
-                      {fotos.length > 0 ? (
-                        <div className="flex gap-1 flex-wrap">
-                          {fotos.map((url, idx) => (
-                            <img
-                              key={idx}
-                              src={url}
-                              alt="Foto"
-                              className="w-20 h-20 object-cover"
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+              {itens.map((item, index) => (
+                <tr key={item.id}>
+                  <td className="border border-gray-300 px-2 py-1">
+                    {index + 1}
+                  </td>
+                  <td className="border border-gray-300 px-2 py-1">
+                    {item.quantidade_item || ""}
+                  </td>
+                  <td className="border border-gray-300 px-2 py-1">
+                    {item.lacre || ""}
+                  </td>
+                  <td className="border border-gray-300 px-2 py-1">
+                    {item.descricao || ""}
+                  </td>
+                  <td className="border border-gray-300 px-2 py-1">
+                    {item.local_encontrado || ""}
+                  </td>
+                  <td className="border border-gray-300 px-2 py-1">
+                    {item.signedFotos && item.signedFotos.length > 0 ? (
+                      <div className="flex gap-1 flex-wrap">
+                        {item.signedFotos.map((url, idx) => (
+                          <img
+                            key={idx}
+                            src={url}
+                            alt="Foto"
+                            className="w-24 h-24 object-cover"
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
