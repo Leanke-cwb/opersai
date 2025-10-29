@@ -160,6 +160,7 @@ export default function GerarAutoCircunstanciado() {
     const dataCumprimento = encerramento?.encerrado_em
       ? new Date(encerramento.encerrado_em).toLocaleString("pt-BR")
       : "—";
+
     const justificativaTexto = encerramento?.justificativa?.trim() || "—";
 
     const texto = `INVESTIGADO: ${alvo?.nome || "—"}
@@ -222,8 +223,6 @@ ${justificativaTexto}
         rowPageBreak: "avoid",
         didParseCell: (data) => {
           if (data.section === "body" && data.column.index === 5) {
-            const photoPadding = 2;
-            const photoHeight = 35;
             if (data.row.height < photoHeight + 2 * photoPadding) {
               data.row.height = photoHeight + 2 * photoPadding;
             }
@@ -232,15 +231,13 @@ ${justificativaTexto}
         didDrawCell: (data) => {
           if (data.section === "body" && data.column.index === 5) {
             const item = itensComBase64[data.row.index];
+            if (!item.base64Fotos?.length) return;
+
             const cellX = data.cell.x;
             const cellY = data.cell.y;
             const cellWidth = data.cell.width;
             const cellHeight = data.row.height;
 
-            if (!item.base64Fotos?.length) return;
-
-            const photoPadding = 2;
-            const photoHeight = 35;
             const photos = item.base64Fotos.slice(0, 2);
             const photoAvailableWidth =
               cellWidth - photoPadding * (photos.length + 1);
@@ -267,7 +264,6 @@ ${justificativaTexto}
         },
       });
 
-      // Posição para texto abaixo da tabela
       let finalY = doc.lastAutoTable.finalY || startY + 20;
       const totalItens = itens.length;
       const pluralItem = totalItens === 1 ? "item" : "itens";
@@ -276,6 +272,50 @@ ${justificativaTexto}
       doc.setFontSize(11);
       doc.setFont("times", "normal");
       doc.text(textoResumo, 14, finalY + 10);
+
+      // Tabela 4x4 no PDF
+      const tabela4x4Body = [
+        [
+          "Linha 1, Cel 1",
+          "Linha 1, Cel 2",
+          "Linha 1, Cel 3",
+          "Linha 1, Cel 4",
+        ],
+        [
+          "Linha 2, Cel 1",
+          "Linha 2, Cel 2",
+          "Linha 2, Cel 3",
+          "Linha 2, Cel 4",
+        ],
+        [
+          "Linha 3, Cel 1",
+          "Linha 3, Cel 2",
+          "Linha 3, Cel 3",
+          "Linha 3, Cel 4",
+        ],
+        [
+          "Linha 4, Cel 1",
+          "Linha 4, Cel 2",
+          "Linha 4, Cel 3",
+          "Linha 4, Cel 4",
+        ],
+      ];
+
+      const posTabela4x4 = finalY + 30;
+
+      doc.setFontSize(12);
+      doc.setFont("times", "bold");
+      doc.text("Policiais Executores da Busca e Apreensão", 14, posTabela4x4);
+
+      autoTable(doc, {
+        startY: posTabela4x4 + 8,
+        head: [["Id", "Posto", "Nome Completo", "CPF"]],
+        body: tabela4x4Body,
+        theme: "grid",
+        margin: { left: tableMargin, right: tableMargin },
+        headStyles: { fillColor: [230, 230, 230] },
+        styles: { fontSize: 10 },
+      });
     }
 
     doc.save(`AutoCircunstanciado_${alvo?.numero_alvo || "000"}.pdf`);
@@ -389,6 +429,89 @@ ${encerramento?.justificativa?.trim() || "—"}
                   </td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+          {/* Texto abaixo da tabela */}
+          {itens.length > 0 && (
+            <p className="mt-4 font-normal text-base">
+              {`E sendo o que havia para relacionar, totalizando a arrecadação de ${
+                itens.length
+              } ${
+                itens.length === 1 ? "item" : "itens"
+              }, deu-se por encerrada a presente busca.`}
+            </p>
+          )}
+          {/* Tabela 4x4 abaixo do texto */}
+          <table className="table-auto border-collapse border border-gray-300 w-full mt-6">
+            <thead>
+              <h1 className="">Policiais Executores do Mandado de Busca</h1>
+
+              <tr className="bg-gray-200">
+                <th className="border border-gray-300 px-3 py-1">Id</th>
+                <th className="border border-gray-300 px-3 py-1">Posto</th>
+                <th className="border border-gray-300 px-3 py-1">
+                  Nome Completo 3
+                </th>
+                <th className="border border-gray-300 px-3 py-1">CPF 4</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="border border-gray-300 px-3 py-1">
+                  Linha 1, Cel 1
+                </td>
+                <td className="border border-gray-300 px-3 py-1">
+                  Linha 1, Cel 2
+                </td>
+                <td className="border border-gray-300 px-3 py-1">
+                  Linha 1, Cel 3
+                </td>
+                <td className="border border-gray-300 px-3 py-1">
+                  Linha 1, Cel 4
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 px-3 py-1">
+                  Linha 2, Cel 1
+                </td>
+                <td className="border border-gray-300 px-3 py-1">
+                  Linha 2, Cel 2
+                </td>
+                <td className="border border-gray-300 px-3 py-1">
+                  Linha 2, Cel 3
+                </td>
+                <td className="border border-gray-300 px-3 py-1">
+                  Linha 2, Cel 4
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 px-3 py-1">
+                  Linha 3, Cel 1
+                </td>
+                <td className="border border-gray-300 px-3 py-1">
+                  Linha 3, Cel 2
+                </td>
+                <td className="border border-gray-300 px-3 py-1">
+                  Linha 3, Cel 3
+                </td>
+                <td className="border border-gray-300 px-3 py-1">
+                  Linha 3, Cel 4
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 px-3 py-1">
+                  Linha 4, Cel 1
+                </td>
+                <td className="border border-gray-300 px-3 py-1">
+                  Linha 4, Cel 2
+                </td>
+                <td className="border border-gray-300 px-3 py-1">
+                  Linha 4, Cel 3
+                </td>
+                <td className="border border-gray-300 px-3 py-1">
+                  Linha 4, Cel 4
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
