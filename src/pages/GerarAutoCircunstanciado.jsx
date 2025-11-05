@@ -22,9 +22,12 @@ export default function GerarAutoCircunstanciado() {
 
   useEffect(() => {
     if (!alvoId) return;
+
     async function fetchDados() {
       try {
         setCarregando(true);
+
+        // 🔹 Buscar dados do alvo
         const { data: alvoData } = await supabase
           .from("alvos")
           .select("*")
@@ -32,6 +35,7 @@ export default function GerarAutoCircunstanciado() {
           .maybeSingle();
         setAlvo(alvoData);
 
+        // 🔹 Buscar dados da operação
         const { data: operacaoData } = await supabase
           .from("operacoes")
           .select("*")
@@ -39,6 +43,7 @@ export default function GerarAutoCircunstanciado() {
           .maybeSingle();
         setOperacao(operacaoData);
 
+        // 🔹 Buscar encerramento
         const { data: encerramentoData } = await supabase
           .from("operacoes_encerramento")
           .select("*")
@@ -49,18 +54,68 @@ export default function GerarAutoCircunstanciado() {
           .maybeSingle();
         setEncerramento(encerramentoData || null);
 
-        const { data: comandanteData } = await supabase
+        // 🔹 Buscar comandante e integrantes
+        const { data: cumprimentoData, error: erroCumprimento } = await supabase
           .from("cumprimento_mandado")
-          .select("comandante_nome, comandante_posto_graduacao")
+          .select(
+            "comandante_nome, comandante_posto_graduacao, comandante_cpf, integrantes"
+          )
           .eq("alvo_id", alvoId)
           .maybeSingle();
-        setComandante(
-          comandanteData || {
-            comandante_nome: "—",
-            comandante_posto_graduacao: "—",
-          }
-        );
+        if (erroCumprimento)
+          console.error("❌ Erro cumprimento_mandado:", erroCumprimento);
+        console.log("📦 Dados de cumprimento_mandado:", cumprimentoData);
 
+        let policiaisLista = [];
+
+        if (cumprimentoData) {
+          // 1️⃣ Comandante (linha 1)
+          policiaisLista.push({
+            id: 1,
+            posto: cumprimentoData.comandante_posto_graduacao || "—",
+            nome_completo: cumprimentoData.comandante_nome || "—",
+            cpf: cumprimentoData.comandante_cpf || "—",
+          });
+
+          // 2️⃣ Integrantes (linha 2 em diante)
+          const integrantes = cumprimentoData.integrantes || [];
+          console.log("👮 Integrantes encontrados:", integrantes);
+
+          for (let i = 0; i < integrantes.length; i++) {
+            const integranteId = cleanUUID(integrantes[i]);
+            if (!integranteId) continue;
+
+            console.log(
+              `🔍 Buscando dados do integrante ${i + 1}:`,
+              integranteId
+            );
+
+            const { data: userData, error: erroUser } = await supabase
+              .from("usuarios")
+              .select("posto_graduacao, nome, cpf, id, user_id")
+              .eq("user_id", integranteId)
+              .maybeSingle();
+
+            if (erroUser)
+              console.error(
+                `❌ Erro ao buscar usuário ${integranteId}:`,
+                erroUser
+              );
+            console.log(`📦 Dados do usuário ${integranteId}:`, userData);
+
+            policiaisLista.push({
+              id: i + 2,
+              posto: userData?.posto_graduacao || "—",
+              nome_completo: userData?.nome || "—",
+              cpf: userData?.cpf || "—",
+            });
+          }
+        }
+
+        console.log("✅ Lista final de policiais:", policiaisLista);
+        setPoliciais(policiaisLista);
+
+        // 🔹 Buscar itens
         const { data: itensData } = await supabase
           .from("auto_itens")
           .select("*")
@@ -94,19 +149,15 @@ export default function GerarAutoCircunstanciado() {
             return { ...item, signedFotos: signedFotos.filter(Boolean) };
           })
         );
-        setItens(itensComUrls);
 
-        // 🔹 Buscar policiais executores
-        const { data: policiaisData } = await supabase
-          .from("policiais")
-          .select("id, posto, nome_completo, cpf");
-        setPoliciais(policiaisData || []);
+        setItens(itensComUrls);
       } catch (error) {
         console.error("❌ Erro ao buscar dados:", error);
       } finally {
         setCarregando(false);
       }
     }
+
     fetchDados();
   }, [alvoId]);
 
@@ -116,6 +167,7 @@ export default function GerarAutoCircunstanciado() {
     const tableMargin = 14;
     const photoPadding = 2;
     const photoHeight = 35;
+
     const logoPMPR =
       "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png";
     const logoCOGER =
@@ -179,7 +231,7 @@ ${justificativaTexto}
       doc.text("Itens Apreendidos:", 14, startY);
       startY += 8;
 
-      // Convertemos as fotos para base64 para poder usar doc.addImage
+      // Converte fotos para base64
       const itensComBase64 = await Promise.all(
         itens.map(async (item) => {
           const base64Fotos = await Promise.all(
@@ -222,61 +274,9 @@ ${justificativaTexto}
         },
         rowPageBreak: "avoid",
         didParseCell: (data) => {
-          // aumenta a altura da linha quando for coluna de fotos
           if (data.section === "body" && data.column.index === 5) {
             if (data.row.height < photoHeight + 2 * photoPadding) {
               data.row.height = photoHeight + 2 * photoPadding;
-            }
-          }
-        },
-        didDrawCell: (data) => {
-          // desenha imagens na coluna "Fotos"
-          if (data.section === "body" && data.column.index === 5) {
-            const item = itensComBase64[data.row.index];
-            if (!item || !item.base64Fotos?.length) return;
-
-            const cellX = data.cell.x;
-            const cellY = data.cell.y;
-            const cellWidth = data.cell.width;
-            const cellHeight = data.row.height;
-
-            const photos = item.base64Fotos.slice(0, 2); // desenha até 2 imagens por célula
-            const photoAvailableWidth =
-              cellWidth - photoPadding * (photos.length + 1);
-            const photoWidthAdjusted = photoAvailableWidth / photos.length;
-
-            photos.forEach((img, idx) => {
-              try {
-                const x =
-                  cellX +
-                  photoPadding +
-                  idx * (photoWidthAdjusted + photoPadding);
-                const y = cellY + photoPadding;
-                // detecta tipo de imagem base64 (jpeg/png)
-                const imgType = img.startsWith("data:image/png")
-                  ? "PNG"
-                  : "JPEG";
-                doc.addImage(
-                  img,
-                  imgType,
-                  x,
-                  y,
-                  photoWidthAdjusted,
-                  photoHeight
-                );
-              } catch (e) {
-                // se falhar, ignora a imagem (para não quebrar o PDF)
-                console.warn("Erro ao adicionar imagem no PDF:", e);
-              }
-            });
-
-            if (item.base64Fotos.length > 2) {
-              const more = `+${item.base64Fotos.length - 2} mais`;
-              doc.setFontSize(8);
-              doc.setTextColor(100);
-              doc.text(more, cellX + photoPadding, cellY + cellHeight - 3);
-              doc.setFontSize(11);
-              doc.setTextColor(0);
             }
           }
         },
@@ -292,13 +292,6 @@ ${justificativaTexto}
       doc.text(textoResumo, 14, finalY + 10);
 
       // 🔹 Tabela Policiais no PDF
-      const tabelaPoliciais = (policiais || []).map((p) => [
-        p.id,
-        p.posto,
-        p.nome_completo,
-        p.cpf,
-      ]);
-
       const posTabela = finalY + 30;
       doc.setFontSize(12);
       doc.setFont("times", "bold");
@@ -306,12 +299,12 @@ ${justificativaTexto}
 
       autoTable(doc, {
         startY: posTabela + 8,
-        head: [["Id", "Posto", "Nome Completo", "CPF"]],
-        body: tabelaPoliciais,
+        head: [["ID", "Posto", "Nome Completo", "CPF"]],
+        body: policiais,
         theme: "grid",
-        margin: { left: tableMargin, right: tableMargin },
         headStyles: { fillColor: [230, 230, 230] },
         styles: { fontSize: 10 },
+        margin: { left: tableMargin, right: tableMargin },
       });
     }
 
@@ -428,9 +421,13 @@ ${encerramento?.justificativa?.trim() || "—"}`;
           {/* 🔹 Tabela Policiais (na tela) */}
           <table className="table-auto border-collapse border border-gray-300 w-full mt-6">
             <thead>
-              <h1>Policiais Executores do Mandado de Busca</h1>
+              <tr>
+                <th colSpan={4} className="text-center bg-gray-200 py-2">
+                  Policiais Executores do Mandado de Busca
+                </th>
+              </tr>
               <tr className="bg-gray-200">
-                <th>Id</th>
+                <th>ID</th>
                 <th>Posto</th>
                 <th>Nome Completo</th>
                 <th>CPF</th>
