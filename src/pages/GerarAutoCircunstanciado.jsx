@@ -27,7 +27,6 @@ export default function GerarAutoCircunstanciado() {
       try {
         setCarregando(true);
 
-        // 🔹 Buscar dados do alvo
         const { data: alvoData } = await supabase
           .from("alvos")
           .select("*")
@@ -35,7 +34,6 @@ export default function GerarAutoCircunstanciado() {
           .maybeSingle();
         setAlvo(alvoData);
 
-        // 🔹 Buscar dados da operação
         const { data: operacaoData } = await supabase
           .from("operacoes")
           .select("*")
@@ -43,7 +41,6 @@ export default function GerarAutoCircunstanciado() {
           .maybeSingle();
         setOperacao(operacaoData);
 
-        // 🔹 Buscar encerramento
         const { data: encerramentoData } = await supabase
           .from("operacoes_encerramento")
           .select("*")
@@ -54,22 +51,20 @@ export default function GerarAutoCircunstanciado() {
           .maybeSingle();
         setEncerramento(encerramentoData || null);
 
-        // 🔹 Buscar comandante e integrantes
-        const { data: cumprimentoData, error: erroCumprimento } = await supabase
+        const { data: cumprimentoData } = await supabase
           .from("cumprimento_mandado")
           .select(
             "comandante_nome, comandante_posto_graduacao, comandante_cpf, integrantes"
           )
           .eq("alvo_id", alvoId)
           .maybeSingle();
-        if (erroCumprimento)
-          console.error("❌ Erro cumprimento_mandado:", erroCumprimento);
-        console.log("📦 Dados de cumprimento_mandado:", cumprimentoData);
-
-        let policiaisLista = [];
 
         if (cumprimentoData) {
-          // 1️⃣ Comandante (linha 1)
+          setComandante(cumprimentoData);
+        }
+
+        let policiaisLista = [];
+        if (cumprimentoData) {
           policiaisLista.push({
             id: 1,
             posto: cumprimentoData.comandante_posto_graduacao || "—",
@@ -77,32 +72,15 @@ export default function GerarAutoCircunstanciado() {
             cpf: cumprimentoData.comandante_cpf || "—",
           });
 
-          // 2️⃣ Integrantes (linha 2 em diante)
           const integrantes = cumprimentoData.integrantes || [];
-          console.log("👮 Integrantes encontrados:", integrantes);
-
           for (let i = 0; i < integrantes.length; i++) {
             const integranteId = cleanUUID(integrantes[i]);
             if (!integranteId) continue;
-
-            console.log(
-              `🔍 Buscando dados do integrante ${i + 1}:`,
-              integranteId
-            );
-
-            const { data: userData, error: erroUser } = await supabase
+            const { data: userData } = await supabase
               .from("usuarios")
               .select("posto_graduacao, nome, cpf, id, user_id")
               .eq("user_id", integranteId)
               .maybeSingle();
-
-            if (erroUser)
-              console.error(
-                `❌ Erro ao buscar usuário ${integranteId}:`,
-                erroUser
-              );
-            console.log(`📦 Dados do usuário ${integranteId}:`, userData);
-
             policiaisLista.push({
               id: i + 2,
               posto: userData?.posto_graduacao || "—",
@@ -111,11 +89,8 @@ export default function GerarAutoCircunstanciado() {
             });
           }
         }
-
-        console.log("✅ Lista final de policiais:", policiaisLista);
         setPoliciais(policiaisLista);
 
-        // 🔹 Buscar itens
         const { data: itensData } = await supabase
           .from("auto_itens")
           .select("*")
@@ -165,7 +140,6 @@ export default function GerarAutoCircunstanciado() {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const tableMargin = 14;
-    const photoPadding = 2;
     const photoHeight = 35;
 
     const logoPMPR =
@@ -211,7 +185,6 @@ export default function GerarAutoCircunstanciado() {
     const dataCumprimento = encerramento?.encerrado_em
       ? new Date(encerramento.encerrado_em).toLocaleString("pt-BR")
       : "—";
-
     const justificativaTexto = encerramento?.justificativa?.trim() || "—";
 
     const texto = `INVESTIGADO: ${alvo?.nome || "—"}
@@ -222,8 +195,7 @@ Aos ${dataCumprimento}, em cumprimento ao MANDADO DE BUSCA E APREENSÃO expedido
     }, ${alvo?.cidade || "—"}, na presença das testemunhas.
 
 CERTIFICO AINDA QUE:
-${justificativaTexto}
-`;
+${justificativaTexto}`;
     doc.text(texto, 14, yPos, { maxWidth: pageWidth - 28 });
 
     if (itens.length > 0) {
@@ -231,7 +203,7 @@ ${justificativaTexto}
       doc.text("Itens Apreendidos:", 14, startY);
       startY += 8;
 
-      // Converte fotos para base64
+      // Fotos em base64
       const itensComBase64 = await Promise.all(
         itens.map(async (item) => {
           const base64Fotos = await Promise.all(
@@ -252,6 +224,10 @@ ${justificativaTexto}
         })
       );
 
+      // tabela
+      const photoSize = 25; // tamanho fixo das fotos
+      const photoPadding = 2; // espaçamento interno
+
       autoTable(doc, {
         startY,
         head: [
@@ -267,44 +243,54 @@ ${justificativaTexto}
         ]),
         theme: "grid",
         headStyles: { fillColor: [230, 230, 230] },
-        margin: { left: tableMargin, right: tableMargin },
-        columnStyles: {
-          3: { cellWidth: 40 },
-          5: { cellWidth: 55 },
+        columnStyles: { 3: { cellWidth: 40 }, 5: { cellWidth: 60 } },
+        didDrawCell: (data) => {
+          if (data.section === "body" && data.column.index === 5) {
+            const fotos = itensComBase64[data.row.index].base64Fotos;
+            if (fotos?.length) {
+              fotos.slice(0, 2).forEach((img, idx) => {
+                try {
+                  const imgX =
+                    data.cell.x +
+                    photoPadding +
+                    idx * (photoSize + photoPadding);
+                  const imgY = data.cell.y + photoPadding;
+                  doc.addImage(img, "JPEG", imgX, imgY, photoSize, photoSize);
+                } catch (err) {
+                  console.warn("Erro ao adicionar imagem:", err);
+                }
+              });
+            }
+          }
         },
-        rowPageBreak: "avoid",
+        // aumenta a altura das células para acomodar as fotos
         didParseCell: (data) => {
           if (data.section === "body" && data.column.index === 5) {
-            if (data.row.height < photoHeight + 2 * photoPadding) {
-              data.row.height = photoHeight + 2 * photoPadding;
-            }
+            data.cell.styles.minCellHeight = photoSize + photoPadding * 2;
           }
         },
       });
 
       let finalY = doc.lastAutoTable.finalY || startY + 20;
       const totalItens = itens.length;
-      const pluralItem = totalItens === 1 ? "item" : "itens";
-      const textoResumo = `E sendo o que havia para relacionar, totalizando a arrecadação de ${totalItens} ${pluralItem}, deu-se por encerrada a presente busca.`;
+      doc.text(
+        `E sendo o que havia para relacionar, totalizando ${totalItens} ${
+          totalItens === 1 ? "item" : "itens"
+        }, deu-se por encerrada a presente busca.`,
+        14,
+        finalY + 10
+      );
 
-      doc.setFontSize(11);
-      doc.setFont("times", "normal");
-      doc.text(textoResumo, 14, finalY + 10);
-
-      // 🔹 Tabela Policiais no PDF
+      // tabela policiais
       const posTabela = finalY + 30;
-      doc.setFontSize(12);
       doc.setFont("times", "bold");
-      doc.text("Policiais Executores da Busca e Apreensão", 14, posTabela);
-
+      doc.text("Policiais Executores do Mandado de Busca", 14, posTabela);
       autoTable(doc, {
         startY: posTabela + 8,
         head: [["ID", "Posto", "Nome Completo", "CPF"]],
-        body: policiais,
+        body: policiais.map((p) => [p.id, p.posto, p.nome_completo, p.cpf]),
         theme: "grid",
         headStyles: { fillColor: [230, 230, 230] },
-        styles: { fontSize: 10 },
-        margin: { left: tableMargin, right: tableMargin },
       });
     }
 
@@ -312,23 +298,17 @@ ${justificativaTexto}
   }
 
   if (carregando) return <p>Carregando dados...</p>;
-  if (!alvo || !operacao)
-    return (
-      <p className="text-red-600 p-4">
-        ❌ Não foi possível carregar os dados do alvo ou operação.
-      </p>
-    );
 
-  const textoAuto = `INVESTIGADO: ${alvo.nome}
+  const textoAuto = `INVESTIGADO: ${alvo?.nome}
 Aos ${
     encerramento?.encerrado_em
       ? new Date(encerramento.encerrado_em).toLocaleString("pt-BR")
       : "—"
   }, em cumprimento ao MANDADO DE BUSCA E APREENSÃO expedido junto aos Autos nº ${
-    operacao.numero_autos
-  }, da Vara ${operacao.vara} /PR, compareceu no imóvel, situado à ${
-    alvo.endereco
-  }, ${alvo.cidade}, na presença das testemunhas.
+    operacao?.numero_autos
+  }, da Vara ${operacao?.vara} /PR, compareceu no imóvel, situado à ${
+    alvo?.endereco
+  }, ${alvo?.cidade}, na presença das testemunhas.
 
 CERTIFICO AINDA QUE:
 ${encerramento?.justificativa?.trim() || "—"}`;
@@ -338,20 +318,21 @@ ${encerramento?.justificativa?.trim() || "—"}`;
       <h1 className="text-2xl mb-6 font-bold">
         AUTO CIRCUNSTANCIADO DE BUSCA e APREENSÃO
       </h1>
+
       <p>
-        <strong>Operação:</strong> {operacao.nome_operacao}
+        <strong>Operação:</strong> {operacao?.nome_operacao}
       </p>
       <p>
-        <strong>Alvo Nº:</strong> {alvo.numero_alvo} - <strong>Nome:</strong>{" "}
-        {alvo.nome}
+        <strong>Alvo Nº:</strong> {alvo?.numero_alvo} - <strong>Nome:</strong>{" "}
+        {alvo?.nome}
       </p>
       <p>
-        <strong>Endereço:</strong> {alvo.endereco} - <strong>Cidade:</strong>{" "}
-        {alvo.cidade}
+        <strong>Endereço:</strong> {alvo?.endereco} - <strong>Cidade:</strong>{" "}
+        {alvo?.cidade}
       </p>
       <p>
-        <strong>Vara:</strong> {operacao.vara} - <strong>Autos nº:</strong>{" "}
-        {operacao.numero_autos}
+        <strong>Vara:</strong> {operacao?.vara} - <strong>Autos nº:</strong>{" "}
+        {operacao?.numero_autos}
       </p>
       <p>
         <strong>Comandante:</strong> {comandante?.comandante_nome || "—"} -{" "}
@@ -372,26 +353,38 @@ ${encerramento?.justificativa?.trim() || "—"}`;
       {itens.length > 0 && (
         <div className="mt-6">
           <h2 className="font-semibold mb-2">Itens Apreendidos:</h2>
-          <table className="table-auto border-collapse border border-gray-300 w-full">
+
+          {/* 🔹 Corrigido: bordas visíveis em todas as células */}
+          <table className="table-auto border-collapse border border-gray-400 w-full">
             <thead>
               <tr className="bg-gray-200">
-                <th>Item nº</th>
-                <th>Quantidade</th>
-                <th>Lacre nº</th>
-                <th>Descrição</th>
-                <th>Local</th>
-                <th>Fotos</th>
+                <th className="border border-gray-400 px-2 py-1">Item nº</th>
+                <th className="border border-gray-400 px-2 py-1">Quantidade</th>
+                <th className="border border-gray-400 px-2 py-1">Lacre nº</th>
+                <th className="border border-gray-400 px-2 py-1">Descrição</th>
+                <th className="border border-gray-400 px-2 py-1">Local</th>
+                <th className="border border-gray-400 px-2 py-1">Fotos</th>
               </tr>
             </thead>
             <tbody>
               {itens.map((item, index) => (
                 <tr key={item.id}>
-                  <td>{index + 1}</td>
-                  <td>{item.quantidade_item}</td>
-                  <td>{item.lacre}</td>
-                  <td>{item.descricao}</td>
-                  <td>{item.local_encontrado}</td>
-                  <td>
+                  <td className="border border-gray-400 px-2 py-1">
+                    {index + 1}
+                  </td>
+                  <td className="border border-gray-400 px-2 py-1">
+                    {item.quantidade_item}
+                  </td>
+                  <td className="border border-gray-400 px-2 py-1">
+                    {item.lacre}
+                  </td>
+                  <td className="border border-gray-400 px-2 py-1">
+                    {item.descricao}
+                  </td>
+                  <td className="border border-gray-400 px-2 py-1">
+                    {item.local_encontrado}
+                  </td>
+                  <td className="border border-gray-400 px-2 py-1">
                     {item.signedFotos?.length ? (
                       <div className="flex gap-1 flex-wrap">
                         {item.signedFotos.map((url, idx) => (
@@ -399,7 +392,7 @@ ${encerramento?.justificativa?.trim() || "—"}`;
                             key={idx}
                             src={url}
                             alt="Foto"
-                            className="w-24 h-24 object-cover"
+                            className="w-24 h-24 object-cover border border-gray-300"
                           />
                         ))}
                       </div>
@@ -412,38 +405,43 @@ ${encerramento?.justificativa?.trim() || "—"}`;
             </tbody>
           </table>
 
-          <p className="mt-4">{`E sendo o que havia para relacionar, totalizando a arrecadação de ${
+          <p className="mt-4">{`E sendo o que havia para relacionar, totalizando ${
             itens.length
           } ${
             itens.length === 1 ? "item" : "itens"
           }, deu-se por encerrada a presente busca.`}</p>
 
-          {/* 🔹 Tabela Policiais (na tela) */}
-          <table className="table-auto border-collapse border border-gray-300 w-full mt-6">
+          {/* 🔹 Tabela Policiais (mantida igual) */}
+          <table className="table-auto border-collapse border border-gray-400 w-full mt-6">
             <thead>
               <tr>
-                <th colSpan={4} className="text-center bg-gray-200 py-2">
+                <th
+                  colSpan={4}
+                  className="text-center bg-gray-200 py-2 border border-gray-400"
+                >
                   Policiais Executores do Mandado de Busca
                 </th>
               </tr>
               <tr className="bg-gray-200">
-                <th>ID</th>
-                <th>Posto</th>
-                <th>Nome Completo</th>
-                <th>CPF</th>
+                <th className="border border-gray-400 px-2 py-1">ID</th>
+                <th className="border border-gray-400 px-2 py-1">Posto</th>
+                <th className="border border-gray-400 px-2 py-1">
+                  Nome Completo
+                </th>
+                <th className="border border-gray-400 px-2 py-1">CPF</th>
               </tr>
             </thead>
             <tbody>
               {policiais.map((p) => (
                 <tr key={p.id}>
-                  <td className="border border-gray-300 px-3 py-1">{p.id}</td>
-                  <td className="border border-gray-300 px-3 py-1">
+                  <td className="border border-gray-400 px-2 py-1">{p.id}</td>
+                  <td className="border border-gray-400 px-2 py-1">
                     {p.posto}
                   </td>
-                  <td className="border border-gray-300 px-3 py-1">
+                  <td className="border border-gray-400 px-2 py-1">
                     {p.nome_completo}
                   </td>
-                  <td className="border border-gray-300 px-3 py-1">{p.cpf}</td>
+                  <td className="border border-gray-400 px-2 py-1">{p.cpf}</td>
                 </tr>
               ))}
             </tbody>
