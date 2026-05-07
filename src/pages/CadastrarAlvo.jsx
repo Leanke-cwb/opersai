@@ -21,28 +21,31 @@ export default function CadastrarAlvo() {
   const [fotoResidencia, setFotoResidencia] = useState(null);
   const [operacoes, setOperacoes] = useState([]);
   const [alvos, setAlvos] = useState([]);
+  const [editandoId, setEditandoId] = useState(null);
   const navigate = useNavigate();
 
-  // Carrega operações e alvos do usuário
   useEffect(() => {
     async function carregarDados() {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
       if (userError || !user) return alert("Usuário não autenticado");
 
       const { data: ops, error: opError } = await supabase
         .from("operacoes")
-        .select("id, nome_operacao")
-        //.eq("user_id", user.id);
+        .select("id, nome_operacao");
 
       if (!opError) setOperacoes(ops);
 
       const { data: alvosData, error: alvoError } = await supabase
         .from("alvos")
-        .select("*")
-        //.eq("user_id", user.id);
+        .select("*");
 
       if (!alvoError) setAlvos(alvosData);
     }
+
     carregarDados();
   }, []);
 
@@ -50,28 +53,41 @@ export default function CadastrarAlvo() {
     const { name, value } = e.target;
     let newValue = value;
 
-    // Máscara para CPF
     if (name === "cpf") {
       const apenasNumeros = value.replace(/\D/g, "").slice(0, 11);
       let masked = "";
+
       for (let i = 0; i < apenasNumeros.length; i++) {
         masked += apenasNumeros[i];
         if (i === 2 || i === 5) masked += ".";
         if (i === 8) masked += "-";
       }
+
       newValue = masked;
     }
 
-    // Limita tamanho dos outros campos
-    if (name === "numero_alvo" && value.length > 5) newValue = value.slice(0, 5);
+    if (name === "numero_alvo" && value.length > 5)
+      newValue = value.slice(0, 5);
+
     if (name === "nome" && value.length > 50) newValue = value.slice(0, 50);
-    if (name === "observacao_alvo" && value.length > 255) newValue = value.slice(0, 255);
-    if (name === "endereco" && value.length > 200) newValue = value.slice(0, 200);
+
+    if (name === "observacao_alvo" && value.length > 255)
+      newValue = value.slice(0, 255);
+
+    if (name === "endereco" && value.length > 200)
+      newValue = value.slice(0, 200);
+
     if (name === "bairro" && value.length > 100) newValue = value.slice(0, 100);
+
     if (name === "cidade" && value.length > 100) newValue = value.slice(0, 100);
+
     if (name === "latitude" && value.length > 11) newValue = value.slice(0, 11);
-    if (name === "longitude" && value.length > 12) newValue = value.slice(0, 12);
-    if (name === "observacao_residencia" && value.length > 255) newValue = value.slice(0, 255);
+
+    if (name === "longitude" && value.length > 12)
+      newValue = value.slice(0, 12);
+
+    if (name === "observacao_residencia" && value.length > 255)
+      newValue = value.slice(0, 255);
 
     setForm({ ...form, [name]: newValue });
   };
@@ -80,12 +96,41 @@ export default function CadastrarAlvo() {
 
   const uploadImagem = async (bucket, file) => {
     if (!file) return null;
-    const fileName = `${Date.now()}-${file.name}`;
-    const { data, error } = await supabase.storage.from(bucket).upload(fileName, file);
-    if (error) return alert(`Erro ao enviar imagem: ${error.message}`), null;
 
-    const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(fileName);
+    const fileName = `${Date.now()}-${file.name}`;
+
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(fileName, file);
+
+    if (error) {
+      alert(`Erro ao enviar imagem: ${error.message}`);
+      return null;
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(fileName);
+
     return publicUrlData.publicUrl;
+  };
+
+  const handleEdit = (alvo) => {
+    setForm({
+      operacao_id: alvo.operacao_id,
+      numero_alvo: alvo.numero_alvo,
+      nome: alvo.nome,
+      cpf: alvo.cpf,
+      observacao_alvo: alvo.observacao_alvo,
+      endereco: alvo.endereco,
+      bairro: alvo.bairro,
+      cidade: alvo.cidade,
+      latitude: alvo.latitude,
+      longitude: alvo.longitude,
+      observacao_residencia: alvo.observacao_residencia,
+    });
+
+    setEditandoId(alvo.id);
   };
 
   const handleSubmit = async (e) => {
@@ -99,20 +144,64 @@ export default function CadastrarAlvo() {
       return alert("CPF inválido! Use o formato 000.000.000-00");
     }
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
     if (userError || !user) return alert("Usuário não autenticado");
 
     const qrUrl = `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=${form.latitude},${form.longitude}`;
+
     const fotoAlvoUrl = await uploadImagem("imagens-alvo", fotoAlvo);
-    const fotoResidenciaUrl = await uploadImagem("imagens-residencia", fotoResidencia);
 
-    const { data, error } = await supabase.from("alvos").insert([
-      { ...form, foto_alvo_url: fotoAlvoUrl, foto_residencia_url: fotoResidenciaUrl, qrcode_url: qrUrl, user_id: user.id },
-    ]);
+    const fotoResidenciaUrl = await uploadImagem(
+      "imagens-residencia",
+      fotoResidencia,
+    );
 
-    if (error) return alert("Erro ao cadastrar alvo: " + error.message);
+    let error;
+    let data;
 
-    alert("Alvo cadastrado com sucesso!");
+    if (editandoId) {
+      ({ error } = await supabase
+        .from("alvos")
+        .update({
+          ...form,
+          foto_alvo_url: fotoAlvoUrl || undefined,
+          foto_residencia_url: fotoResidenciaUrl || undefined,
+          qrcode_url: qrUrl,
+        })
+        .eq("id", editandoId));
+
+      if (error) {
+        console.log("ERRO UPDATE:", error);
+        alert("Erro ao editar alvo: " + JSON.stringify(error));
+        return;
+      }
+      setAlvos(alvos.map((a) => (a.id === editandoId ? { ...a, ...form } : a)));
+
+      alert("Alvo atualizado com sucesso!");
+      setEditandoId(null);
+    } else {
+      console.log("ID:", editandoId);
+      console.log("PAYLOAD:", payload);
+      ({ data, error } = await supabase.from("alvos").insert([
+        {
+          ...form,
+          foto_alvo_url: fotoAlvoUrl,
+          foto_residencia_url: fotoResidenciaUrl,
+          qrcode_url: qrUrl,
+          user_id: user.id,
+        },
+      ]));
+
+      if (error) return alert("Erro ao cadastrar alvo: " + error.message);
+
+      setAlvos([...alvos, data[0]]);
+      alert("Alvo cadastrado com sucesso!");
+    }
+
     setForm({
       operacao_id: "",
       numero_alvo: "",
@@ -126,16 +215,19 @@ export default function CadastrarAlvo() {
       longitude: "",
       observacao_residencia: "",
     });
+
     setFotoAlvo(null);
     setFotoResidencia(null);
-    setAlvos([...alvos, data[0]]);
   };
 
   const handleDelete = async (id) => {
     if (!confirm("Deseja realmente excluir este alvo?")) return;
+
     const { error } = await supabase.from("alvos").delete().eq("id", id);
+
     if (error) return alert("Erro ao excluir alvo: " + error.message);
-    setAlvos(alvos.filter(a => a.id !== id));
+
+    setAlvos(alvos.filter((a) => a.id !== id));
   };
 
   return (
@@ -147,11 +239,15 @@ export default function CadastrarAlvo() {
         ← Voltar para a Home
       </button>
 
-      <h2 className="text-2xl font-bold mb-6">Cadastrar Alvo</h2>
+      <h2 className="text-2xl font-bold mb-6">
+        {editandoId ? "Editar Alvo" : "Cadastrar Alvo"}
+      </h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-gray-700 font-medium mb-1">Operação</label>
+          <label className="block text-gray-700 font-medium mb-1">
+            Operação
+          </label>
           <select
             name="operacao_id"
             value={form.operacao_id}
@@ -160,113 +256,137 @@ export default function CadastrarAlvo() {
             required
           >
             <option value="">Selecione a operação</option>
-            {operacoes.map(op => (
-              <option key={op.id} value={op.id}>{op.nome_operacao}</option>
+            {operacoes.map((op) => (
+              <option key={op.id} value={op.id}>
+                {op.nome_operacao}
+              </option>
             ))}
           </select>
         </div>
 
-        <div>
-          <label className="block text-gray-700 font-medium mb-1">Número do Alvo</label>
-          <input
-            name="numero_alvo"
-            value={form.numero_alvo}
-            onChange={handleChange}
-            className="border p-2 w-full rounded"
-            maxLength={5}
-            required
-          />
-        </div>
+        <input
+          name="numero_alvo"
+          value={form.numero_alvo}
+          onChange={handleChange}
+          className="border p-2 w-full rounded"
+          placeholder="Número do Alvo"
+          required
+        />
+        <input
+          name="nome"
+          value={form.nome}
+          onChange={handleChange}
+          className="border p-2 w-full rounded"
+          placeholder="Nome"
+          required
+        />
+        <input
+          name="cpf"
+          value={form.cpf}
+          onChange={handleChange}
+          className="border p-2 w-full rounded"
+          placeholder="CPF"
+        />
 
-        <div>
-          <label className="block text-gray-700 font-medium mb-1">Nome</label>
-          <input
-            name="nome"
-            value={form.nome}
-            onChange={handleChange}
-            className="border p-2 w-full rounded"
-            maxLength={50}
-            required
-          />
-        </div>
+        <textarea
+          name="observacao_alvo"
+          value={form.observacao_alvo}
+          onChange={handleChange}
+          className="border p-2 w-full rounded"
+          placeholder="Observação do Alvo"
+        />
 
-        <div>
-          <label className="block text-gray-700 font-medium mb-1">CPF</label>
-          <input
-            name="cpf"
-            value={form.cpf}
-            onChange={handleChange}
-            className="border p-2 w-full rounded"
-            maxLength={14}
-            placeholder="000.000.000-00"
-          />
-        </div>
+        <input
+          type="file"
+          onChange={(e) => setFotoAlvo(e.target.files[0])}
+          accept="image/*"
+        />
 
-        <div>
-          <label className="block text-gray-700 font-medium mb-1">Observação do Alvo</label>
-          <textarea
-            name="observacao_alvo"
-            value={form.observacao_alvo}
-            onChange={handleChange}
-            className="border p-2 w-full rounded"
-            maxLength={255}
-          />
-        </div>
+        <input
+          name="endereco"
+          value={form.endereco}
+          onChange={handleChange}
+          className="border p-2 w-full rounded"
+          placeholder="Endereço"
+        />
+        <input
+          name="bairro"
+          value={form.bairro}
+          onChange={handleChange}
+          className="border p-2 w-full rounded"
+          placeholder="Bairro"
+        />
+        <input
+          name="cidade"
+          value={form.cidade}
+          onChange={handleChange}
+          className="border p-2 w-full rounded"
+          placeholder="Cidade"
+        />
+        <input
+          name="latitude"
+          value={form.latitude}
+          onChange={handleChange}
+          className="border p-2 w-full rounded"
+          placeholder="Latitude"
+        />
+        <input
+          name="longitude"
+          value={form.longitude}
+          onChange={handleChange}
+          className="border p-2 w-full rounded"
+          placeholder="Longitude"
+        />
 
-        <div>
-          <label className="block text-gray-700 font-medium mb-1">Foto do Alvo</label>
-          <input type="file" onChange={e => setFotoAlvo(e.target.files[0])} accept="image/*" />
-        </div>
+        <textarea
+          name="observacao_residencia"
+          value={form.observacao_residencia}
+          onChange={handleChange}
+          className="border p-2 w-full rounded"
+          placeholder="Observação da Residência"
+        />
 
-        <div>
-          <label className="block text-gray-700 font-medium mb-1">Endereço</label>
-          <input name="endereco" value={form.endereco} onChange={handleChange} className="border p-2 w-full rounded" maxLength={200} />
-        </div>
+        <input
+          type="file"
+          onChange={(e) => setFotoResidencia(e.target.files[0])}
+          accept="image/*"
+        />
 
-        <div>
-          <label className="block text-gray-700 font-medium mb-1">Bairro</label>
-          <input name="bairro" value={form.bairro} onChange={handleChange} className="border p-2 w-full rounded" maxLength={100} />
-        </div>
-
-        <div>
-          <label className="block text-gray-700 font-medium mb-1">Cidade</label>
-          <input name="cidade" value={form.cidade} onChange={handleChange} className="border p-2 w-full rounded" maxLength={100} />
-        </div>
-
-        <div>
-          <label className="block text-gray-700 font-medium mb-1">Latitude</label>
-          <input name="latitude" value={form.latitude} onChange={handleChange} className="border p-2 w-full rounded" maxLength={11} placeholder="-00.00000000" />
-        </div>
-
-        <div>
-          <label className="block text-gray-700 font-medium mb-1">Longitude</label>
-          <input name="longitude" value={form.longitude} onChange={handleChange} className="border p-2 w-full rounded" maxLength={12} placeholder="-00.00000000" />
-        </div>
-
-        <div>
-          <label className="block text-gray-700 font-medium mb-1">Observação da Residência</label>
-          <textarea name="observacao_residencia" value={form.observacao_residencia} onChange={handleChange} className="border p-2 w-full rounded" maxLength={255} />
-        </div>
-
-        <div>
-          <label className="block text-gray-700 font-medium mb-1">Foto da Residência</label>
-          <input type="file" onChange={e => setFotoResidencia(e.target.files[0])} accept="image/*" />
-        </div>
-
-        <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">Salvar</button>
+        <button
+          type="submit"
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
+        >
+          {editandoId ? "Atualizar" : "Salvar"}
+        </button>
       </form>
 
       <h3 className="text-xl font-bold mt-6">Alvos Cadastrados</h3>
+
       <ul className="space-y-2">
-        {alvos.map(a => (
-          <li key={a.id} className="flex justify-between items-center border p-2 rounded">
-            <span>{a.nome} | {a.cpf}</span>
-            <button
-              onClick={() => handleDelete(a.id)}
-              className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
-            >
-              Excluir
-            </button>
+        {alvos.map((a) => (
+          <li
+            key={a.id}
+            className="flex justify-between items-center border p-2 rounded"
+          >
+            <span>
+              {a.nome} | {a.cpf}
+            </span>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleEdit(a)}
+                className="bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+              >
+                Editar
+              </button>
+
+              <button
+                onClick={() => handleDelete(a.id)}
+                className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
+              >
+                Excluir
+              </button>
+            </div>
           </li>
         ))}
       </ul>

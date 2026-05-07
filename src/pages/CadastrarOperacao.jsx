@@ -8,18 +8,26 @@ export default function CadastrarOperacao() {
     numero_autos: "",
     vara: "",
   });
+
   const [operacoes, setOperacoes] = useState([]);
+  const [editandoId, setEditandoId] = useState(null);
   const navigate = useNavigate();
 
   // Carrega operações do usuário
   useEffect(() => {
     async function carregarOperacoes() {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
       if (userError || !user) return;
 
-      const { data, error } = await supabase.from("operacoes").select("*");//.eq("user_id", user.id);
+      const { data, error } = await supabase.from("operacoes").select("*");
+
       if (!error) setOperacoes(data);
     }
+
     carregarOperacoes();
   }, []);
 
@@ -27,17 +35,22 @@ export default function CadastrarOperacao() {
     const { name, value } = e.target;
     let newValue = value;
 
-    if (name === "nome_operacao" && value.length > 20) newValue = value.slice(0, 20);
+    if (name === "nome_operacao" && value.length > 20)
+      newValue = value.slice(0, 20);
+
     if (name === "vara" && value.length > 50) newValue = value.slice(0, 50);
 
     // Máscara automática para Número dos Autos
     if (name === "numero_autos") {
       const apenasNumeros = value.replace(/\D/g, "").slice(0, 20);
       let masked = "";
+
       for (let i = 0; i < apenasNumeros.length; i++) {
         masked += apenasNumeros[i];
-        if (i === 6 || i === 8 || i === 12 || i === 13 || i === 15) masked += ".";
+        if (i === 6 || i === 8 || i === 12 || i === 13 || i === 15)
+          masked += ".";
       }
+
       newValue = masked;
     }
 
@@ -49,6 +62,16 @@ export default function CadastrarOperacao() {
     return regex.test(numero);
   };
 
+  const handleEdit = (operacao) => {
+    setForm({
+      nome_operacao: operacao.nome_operacao,
+      numero_autos: operacao.numero_autos,
+      vara: operacao.vara,
+    });
+
+    setEditandoId(operacao.id);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -57,39 +80,74 @@ export default function CadastrarOperacao() {
       return;
     }
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
     if (userError || !user) return;
 
-    // Verifica duplicidade
-    const { data: existente } = await supabase
-      .from("operacoes")
-      .select("*")
-      .or(`nome_operacao.eq.${form.nome_operacao},numero_autos.eq.${form.numero_autos}`)
-      .maybeSingle();
+    if (editandoId) {
+      const { error } = await supabase
+        .from("operacoes")
+        .update(form)
+        .eq("id", editandoId);
 
-    if (existente) {
-      alert("Já existe operação com esse nome ou número dos autos.");
-      return;
-    }
+      if (error) {
+        alert("Erro ao editar operação: " + error.message);
+        return;
+      }
 
-    const { error } = await supabase.from("operacoes").insert({ ...form, user_id: user.id });
-    if (error) {
-      alert("Erro ao cadastrar operação: " + error.message);
+      setOperacoes(
+        operacoes.map((op) => (op.id === editandoId ? { ...op, ...form } : op)),
+      );
+
+      alert("Operação atualizada com sucesso!");
+      setEditandoId(null);
     } else {
+      const { data: existente } = await supabase
+        .from("operacoes")
+        .select("*")
+        .or(
+          `nome_operacao.eq.${form.nome_operacao},numero_autos.eq.${form.numero_autos}`,
+        )
+        .maybeSingle();
+
+      if (existente) {
+        alert("Já existe operação com esse nome ou número dos autos.");
+        return;
+      }
+
+      const { error } = await supabase
+        .from("operacoes")
+        .insert({ ...form, user_id: user.id });
+
+      if (error) {
+        alert("Erro ao cadastrar operação: " + error.message);
+        return;
+      }
+
       alert("Operação cadastrada com sucesso!");
-      setForm({ nome_operacao: "", numero_autos: "", vara: "" });
-      // Atualiza lista
+
       setOperacoes([...operacoes, { ...form, user_id: user.id }]);
     }
+
+    setForm({
+      nome_operacao: "",
+      numero_autos: "",
+      vara: "",
+    });
   };
 
   const handleDelete = async (id) => {
     if (!confirm("Deseja realmente excluir esta operação?")) return;
+
     const { error } = await supabase.from("operacoes").delete().eq("id", id);
+
     if (error) {
       alert("Erro ao excluir operação: " + error.message);
     } else {
-      setOperacoes(operacoes.filter(op => op.id !== id));
+      setOperacoes(operacoes.filter((op) => op.id !== id));
     }
   };
 
@@ -102,7 +160,9 @@ export default function CadastrarOperacao() {
         ← Voltar à Home
       </button>
 
-      <h2 className="text-2xl font-bold mb-4">Cadastrar Operação</h2>
+      <h2 className="text-2xl font-bold mb-4">
+        {editandoId ? "Editar Operação" : "Cadastrar Operação"}
+      </h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -145,21 +205,37 @@ export default function CadastrarOperacao() {
           type="submit"
           className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
         >
-          Salvar
+          {editandoId ? "Atualizar" : "Salvar"}
         </button>
       </form>
 
       <h3 className="text-xl font-bold mt-6">Operações Cadastradas</h3>
+
       <ul className="space-y-2">
-        {operacoes.map(op => (
-          <li key={op.id} className="flex justify-between items-center border p-2 rounded">
-            <span>{op.nome_operacao} | {op.numero_autos}</span>
-            <button
-              onClick={() => handleDelete(op.id)}
-              className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
-            >
-              Excluir
-            </button>
+        {operacoes.map((op) => (
+          <li
+            key={op.id}
+            className="flex justify-between items-center border p-2 rounded"
+          >
+            <span>
+              {op.nome_operacao} | {op.numero_autos}
+            </span>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleEdit(op)}
+                className="bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+              >
+                Editar
+              </button>
+
+              <button
+                onClick={() => handleDelete(op.id)}
+                className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
+              >
+                Excluir
+              </button>
+            </div>
           </li>
         ))}
       </ul>
