@@ -1,5 +1,5 @@
-
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -8,10 +8,93 @@ function cleanUUID(uuidString) {
   if (!uuidString) return null;
   return uuidString.replace(/"/g, "");
 }
+async function gerarHashPDF(blob) {
+  const buffer = await blob.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
 
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function gerarCertidao(hash, alvo, operacao, comandante) {
+  const certDoc = new jsPDF();
+  const pageWidth = certDoc.internal.pageSize.getWidth();
+
+  const logoPMPR =
+    "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png";
+  const logoCOGER =
+    "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/coger.png";
+
+  certDoc.addImage(logoPMPR, "PNG", 15, 10, 25, 25);
+  certDoc.addImage(logoCOGER, "PNG", pageWidth - 40, 10, 25, 25);
+
+  certDoc.setFont("times", "bold");
+  certDoc.setFontSize(13);
+  certDoc.text("POLÍCIA MILITAR DO PARANÁ", pageWidth / 2, 20, {
+    align: "center",
+  });
+  certDoc.text("CORREGEDORIA-GERAL", pageWidth / 2, 27, {
+    align: "center",
+  });
+  certDoc.text("SEÇÃO DE ASSUNTOS INTERNOS", pageWidth / 2, 34, {
+    align: "center",
+  });
+
+  certDoc.line(15, 40, pageWidth - 15, 40);
+
+  certDoc.setFontSize(12);
+  certDoc.text("CERTIDÃO DE INTEGRIDADE DOCUMENTAL", pageWidth / 2, 50, {
+    align: "center",
+  });
+
+  certDoc.setFont("times", "normal");
+  certDoc.setFontSize(11);
+
+  const dataAtual = new Date().toLocaleString("pt-BR");
+
+  const texto = `
+  CERTIFICO, para os devidos fins, que o documento digital denominado AUTO CIRCUNSTANCIADO DE
+BUSCA E APREENSÃO, referente à operação abaixo identificada, foi gerado eletronicamente e possui
+o seguinte código HASH SHA-256 para verificação de integridade:
+
+OPERAÇÃO: ${operacao?.nome_operacao || "—"}
+
+ALVO Nº: ${alvo?.numero_alvo || "—"}
+
+INVESTIGADO: ${alvo?.nome || "—"}
+
+DATA/HORA DA GERAÇÃO: ${dataAtual}
+
+HASH SHA-256:
+
+${hash}
+
+  A autenticidade e integridade do arquivo poderão ser verificadas mediante conferência do hash acima,
+sendo que qualquer alteraçãoposterior invalidará esta certidão.
+`;
+
+  certDoc.text(texto, 14, 70, {
+    maxWidth: pageWidth - 28,
+    align: "left",
+  });
+  certDoc.line(60, 250, 150, 250);
+
+  certDoc.setFont("times", "bold");
+  certDoc.text(comandante?.comandante_nome || "—", 105, 257, {
+    align: "center",
+  });
+
+  certDoc.setFont("times", "normal");
+  certDoc.text(`${comandante?.comandante_posto_graduacao || "—"}`, 105, 263, {
+    align: "center",
+  });
+
+  certDoc.save(`Certidao_Hash_${alvo?.numero_alvo || "000"}.pdf`);
+}
 export default function GerarAutoCircunstanciado() {
   const alvoIdRaw = localStorage.getItem("alvoId");
   const alvoId = cleanUUID(alvoIdRaw);
+  const navigate = useNavigate();
 
   const [alvo, setAlvo] = useState(null);
   const [operacao, setOperacao] = useState(null);
@@ -55,7 +138,7 @@ export default function GerarAutoCircunstanciado() {
         const { data: cumprimentoData } = await supabase
           .from("cumprimento_mandado")
           .select(
-            "comandante_nome, comandante_posto_graduacao, comandante_cpf, integrantes"
+            "comandante_nome, comandante_posto_graduacao, comandante_cpf, integrantes",
           )
           .eq("alvo_id", alvoId)
           .maybeSingle();
@@ -120,10 +203,10 @@ export default function GerarAutoCircunstanciado() {
                 } catch {
                   return null;
                 }
-              })
+              }),
             );
             return { ...item, signedFotos: signedFotos.filter(Boolean) };
-          })
+          }),
         );
 
         setItens(itensComUrls);
@@ -179,7 +262,7 @@ export default function GerarAutoCircunstanciado() {
         comandante?.comandante_posto_graduacao || "—"
       }`,
       14,
-      yPos
+      yPos,
     );
     yPos += 10;
 
@@ -219,10 +302,10 @@ ${justificativaTexto}`;
               } catch {
                 return null;
               }
-            })
+            }),
           );
           return { ...item, base64Fotos: base64Fotos.filter(Boolean) };
-        })
+        }),
       );
 
       // tabela
@@ -246,33 +329,30 @@ ${justificativaTexto}`;
         headStyles: { fillColor: [230, 230, 230] },
         columnStyles: { 3: { cellWidth: 40 }, 5: { cellWidth: 60 } },
         didDrawCell: (data) => {
-  if (data.section === "body" && data.column.index === 5) {
+          if (data.section === "body" && data.column.index === 5) {
+            // ✅ GUARDA NECESSÁRIA (SÓ ISSO)
+            if (
+              !data.row ||
+              data.row.index == null ||
+              !itensComBase64[data.row.index] ||
+              !Array.isArray(itensComBase64[data.row.index].base64Fotos)
+            ) {
+              return;
+            }
 
-    // ✅ GUARDA NECESSÁRIA (SÓ ISSO)
-    if (
-      !data.row ||
-      data.row.index == null ||
-      !itensComBase64[data.row.index] ||
-      !Array.isArray(itensComBase64[data.row.index].base64Fotos)
-    ) {
-      return;
-    }
+            const fotos = itensComBase64[data.row.index].base64Fotos;
 
-    const fotos = itensComBase64[data.row.index].base64Fotos;
+            if (fotos.length) {
+              fotos.slice(0, 2).forEach((img, idx) => {
+                const imgX =
+                  data.cell.x + photoPadding + idx * (photoSize + photoPadding);
+                const imgY = data.cell.y + photoPadding;
 
-    if (fotos.length) {
-      fotos.slice(0, 2).forEach((img, idx) => {
-        const imgX =
-          data.cell.x +
-          photoPadding +
-          idx * (photoSize + photoPadding);
-        const imgY = data.cell.y + photoPadding;
-
-        doc.addImage(img, "JPEG", imgX, imgY, photoSize, photoSize);
-      });
-    }
-  }
-},
+                doc.addImage(img, "JPEG", imgX, imgY, photoSize, photoSize);
+              });
+            }
+          }
+        },
 
         // aumenta a altura das células para acomodar as fotos
         didParseCell: (data) => {
@@ -289,7 +369,7 @@ ${justificativaTexto}`;
           totalItens === 1 ? "item" : "itens"
         }, deu-se por encerrada a presente busca.`,
         14,
-        finalY + 10
+        finalY + 10,
       );
 
       // tabela policiais
@@ -305,9 +385,19 @@ ${justificativaTexto}`;
       });
     }
 
-    doc.save(`AutoCircunstanciado_${alvo?.numero_alvo || "000"}.pdf`);
-  }
+    const pdfArrayBuffer = doc.output("arraybuffer");
+    const blob = new Blob([pdfArrayBuffer], { type: "application/pdf" });
 
+    const hash = await gerarHashPDF(blob);
+
+    // primeiro baixa o Auto Circunstanciado
+    doc.save(`AutoCircunstanciado_${alvo?.numero_alvo || "000"}.pdf`);
+
+    // espera o navegador processar
+    setTimeout(async () => {
+      await gerarCertidao(hash, alvo, operacao, comandante);
+    }, 1500);
+  }
   if (carregando) return <p>Carregando dados...</p>;
 
   const textoAuto = `INVESTIGADO: ${alvo?.nome}
@@ -460,12 +550,21 @@ ${encerramento?.justificativa?.trim() || "—"}`;
         </div>
       )}
 
-      <button
-        className="mt-6 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        onClick={gerarPDF}
-      >
-        Gerar PDF
-      </button>
+      <div className="mt-6 flex gap-4">
+        <button
+          className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+          onClick={() => navigate("/auto-circunstanciado")}
+        >
+          Retornar
+        </button>
+
+        <button
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          onClick={gerarPDF}
+        >
+          Gerar PDF
+        </button>
+      </div>
     </div>
   );
 }
