@@ -8,6 +8,17 @@ function cleanUUID(uuidString) {
   if (!uuidString) return null;
   return uuidString.replace(/"/g, "");
 }
+
+function formatarNomeArquivo(texto) {
+  if (!texto) return "SemOperacao";
+
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+}
 async function gerarHashPDF(blob) {
   const buffer = await blob.arrayBuffer();
   const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
@@ -17,6 +28,8 @@ async function gerarHashPDF(blob) {
 }
 
 async function gerarCertidao(hash, alvo, operacao, comandante) {
+  const nomeOperacao = formatarNomeArquivo(operacao?.nome_operacao);
+  const numeroAlvo = alvo?.numero_alvo || "000";
   const certDoc = new jsPDF();
   const pageWidth = certDoc.internal.pageSize.getWidth();
 
@@ -70,7 +83,7 @@ HASH SHA-256:
 ${hash}
 
   A autenticidade e integridade do arquivo poderão ser verificadas mediante conferência do hash acima,
-sendo que qualquer alteraçãoposterior invalidará esta certidão.
+sendo que qualquer alteração posterior invalidará esta certidão.
 `;
 
   certDoc.text(texto, 14, 70, {
@@ -89,7 +102,7 @@ sendo que qualquer alteraçãoposterior invalidará esta certidão.
     align: "center",
   });
 
-  certDoc.save(`Certidao_Hash_${alvo?.numero_alvo || "000"}.pdf`);
+  certDoc.save(`CertidaoHash_${nomeOperacao}_Alvo_${numeroAlvo}.pdf`);
 }
 export default function GerarAutoCircunstanciado() {
   const alvoIdRaw = localStorage.getItem("alvoId");
@@ -221,6 +234,8 @@ export default function GerarAutoCircunstanciado() {
   }, [alvoId]);
 
   async function gerarPDF() {
+    const nomeOperacao = formatarNomeArquivo(operacao?.nome_operacao);
+    const numeroAlvo = alvo?.numero_alvo || "000";
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const tableMargin = 14;
@@ -391,7 +406,7 @@ ${justificativaTexto}`;
     const hash = await gerarHashPDF(blob);
 
     // primeiro baixa o Auto Circunstanciado
-    doc.save(`AutoCircunstanciado_${alvo?.numero_alvo || "000"}.pdf`);
+    doc.save(`AutoCircunstanciado_${nomeOperacao}_Alvo_${numeroAlvo}.pdf`);
 
     // espera o navegador processar
     setTimeout(async () => {

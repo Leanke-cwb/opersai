@@ -169,7 +169,7 @@ export default function AutoCircunstanciado() {
                             Auto
                           </button>
                           <button className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600">
-                            Hash
+                            Celular
                           </button>
                           <button className="bg-purple-500 text-white px-3 py-1 rounded hover:bg-purple-600">
                             Cumprimento
