@@ -8,6 +8,8 @@ import ConsultaAlvos from "./pages/ConsultaAlvos";
 import AutoCircunstanciado from "./pages/AutoCircunstanciado";
 import Cautela from "./pages/Cautela";
 import GerarAutoCircunstanciado from "./pages/GerarAutoCircunstanciado";
+import GerarFormularioCelular from "./pages/GerarFormularioCelular";
+import SelecionarCelular from "./pages/SelecionarCelular";
 
 export default function App() {
   return (
@@ -24,6 +26,11 @@ export default function App() {
         <Route path="/auto-circunstanciado" element={<AutoCircunstanciado />} />
         <Route path="/cautela" element={<Cautela />} />
         <Route path="/auto" element={<GerarAutoCircunstanciado />} />
+        <Route
+          path="/gerar-formulario-celular"
+          element={<GerarFormularioCelular />}
+        />
+        <Route path="/selecionar-celular" element={<SelecionarCelular />} />
       </Routes>
     </BrowserRouter>
   );

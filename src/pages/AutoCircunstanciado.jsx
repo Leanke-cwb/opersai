@@ -96,6 +96,11 @@ export default function AutoCircunstanciado() {
     localStorage.setItem("alvoId", alvo.id);
     navigate("/auto");
   };
+  // Botão Formulário Celular
+  const handleFormularioCelular = async (alvo) => {
+    localStorage.setItem("alvoId", alvo.id);
+    navigate("/selecionar-celular");
+  };
 
   function handleSelecionarOperacao(event) {
     const id = event.target.value;
@@ -168,7 +173,10 @@ export default function AutoCircunstanciado() {
                           >
                             Auto
                           </button>
-                          <button className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600">
+                          <button
+                            onClick={() => handleFormularioCelular(alvo)}
+                            className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
+                          >
                             Celular
                           </button>
                           <button className="bg-purple-500 text-white px-3 py-1 rounded hover:bg-purple-600">
