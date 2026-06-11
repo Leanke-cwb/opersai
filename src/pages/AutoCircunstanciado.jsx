@@ -22,6 +22,21 @@ export default function AutoCircunstanciado() {
     }
     fetchOperacoes();
   }, []);
+  useEffect(() => {
+  const operacaoSalva = localStorage.getItem(
+    "operacaoSelecionada"
+  );
+
+  if (operacaoSalva) {
+    try {
+      setOperacaoSelecionada(
+        JSON.parse(operacaoSalva)
+      );
+    } catch (err) {
+      console.error(err);
+    }
+  }
+}, []);
 
   // Busca alvos e encerramentos ao selecionar operação
   useEffect(() => {
@@ -110,10 +125,16 @@ export default function AutoCircunstanciado() {
   };
 
   function handleSelecionarOperacao(event) {
-    const id = event.target.value;
-    const operacao = operacoes.find((op) => op.id === id);
-    setOperacaoSelecionada(operacao);
-  }
+  const id = event.target.value;
+  const operacao = operacoes.find((op) => op.id === id);
+
+  setOperacaoSelecionada(operacao);
+
+  localStorage.setItem(
+    "operacaoSelecionada",
+    JSON.stringify(operacao)
+  );
+}
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
