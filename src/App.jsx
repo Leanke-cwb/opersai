@@ -10,6 +10,9 @@ import Cautela from "./pages/Cautela";
 import GerarAutoCircunstanciado from "./pages/GerarAutoCircunstanciado";
 import GerarFormularioCelular from "./pages/GerarFormularioCelular";
 import SelecionarCelular from "./pages/SelecionarCelular";
+import SelecionarCustodia from "./pages/SelecionarCustodia";
+import GerarCadeiaCustodia from "./pages/GerarCadeiaCustodia";
+
 
 export default function App() {
   return (
@@ -31,6 +34,8 @@ export default function App() {
           element={<GerarFormularioCelular />}
         />
         <Route path="/selecionar-celular" element={<SelecionarCelular />} />
+        <Route path="/selecionar-custodia" element={<SelecionarCustodia />} />
+<Route path="/gerar-cadeia-custodia" element={<GerarCadeiaCustodia />} />
       </Routes>
     </BrowserRouter>
   );

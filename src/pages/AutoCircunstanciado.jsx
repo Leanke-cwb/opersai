@@ -96,6 +96,13 @@ export default function AutoCircunstanciado() {
     localStorage.setItem("alvoId", alvo.id);
     navigate("/auto");
   };
+
+  //botão Custodia 
+  const handleCustodia = (alvo) => {
+  localStorage.setItem("alvoId", alvo.id);
+  navigate("/selecionar-custodia");
+};
+
   // Botão Formulário Celular
   const handleFormularioCelular = async (alvo) => {
     localStorage.setItem("alvoId", alvo.id);
@@ -182,7 +189,8 @@ export default function AutoCircunstanciado() {
                           <button className="bg-purple-500 text-white px-3 py-1 rounded hover:bg-purple-600">
                             Cumprimento
                           </button>
-                          <button className="bg-pink-500 text-white px-3 py-1 rounded hover:bg-pink-600">
+                          <button 
+                          onClick={() => handleCustodia(alvo)} className="bg-pink-500 text-white px-3 py-1 rounded hover:bg-pink-600">
                             Custódia
                           </button>
 
