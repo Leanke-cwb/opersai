@@ -43,24 +43,77 @@ export default function GerarFormularioCelular() {
   }
 
   function gerarPDF() {
-    if (!celular) return;
+  if (!celular) return;
 
-    const doc = new jsPDF();
+  const doc = new jsPDF("p", "mm", "a4");
 
-    doc.setFontSize(16);
-    doc.setFont(undefined, "bold");
+  // ========================================
+  // CABEÇALHO PADRÃO COGER
+  // ========================================
 
-    doc.text("FORMULÁRIO DE APREENSÃO DE APARELHO CELULAR", 105, 15, {
-      align: "center",
-    });
+  const pageWidth = doc.internal.pageSize.getWidth();
 
-    doc.setFontSize(10);
-    doc.setFont(undefined, "normal");
+  const logoPMPR =
+    "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png";
 
-    doc.text(`Gerado em ${new Date().toLocaleDateString("pt-BR")}`, 14, 25);
+  const logoCOGER =
+    "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/coger.png";
 
+  // Logos
+  doc.addImage(logoCOGER, "PNG", 15, 10, 25, 25);
+  doc.addImage(logoPMPR, "PNG", pageWidth - 40, 10, 25, 25);
+
+  // Texto institucional
+  doc.setFont("times", "bold");
+  doc.setFontSize(13);
+
+  doc.text(
+    "POLÍCIA MILITAR DO PARANÁ",
+    pageWidth / 2,
+    18,
+    { align: "center" }
+  );
+
+  doc.text(
+    "CORREGEDORIA-GERAL",
+    pageWidth / 2,
+    25,
+    { align: "center" }
+  );
+
+  doc.text(
+    "SEÇÃO DE ASSUNTOS INTERNOS",
+    pageWidth / 2,
+    32,
+    { align: "center" }
+  );
+
+  // Linha divisória
+  doc.line(15, 40, pageWidth - 15, 40);
+
+  // Título do documento
+  doc.setFontSize(12);
+
+  doc.text(
+    "FORMULÁRIO DE APREENSÃO DE APARELHO CELULAR",
+    pageWidth / 2,
+    50,
+    { align: "center" }
+  );
+
+  // Moldura
+  doc.rect(10, 55, 190, 220);
+
+  doc.setFont("times", "normal");
+  doc.setFontSize(10);
+
+  doc.text(
+    `Gerado em ${new Date().toLocaleDateString("pt-BR")}`,
+    14,
+    62
+  );
     autoTable(doc, {
-      startY: 35,
+      startY: 68,
       theme: "grid",
       styles: {
         fontSize: 10,
@@ -105,10 +158,18 @@ export default function GerarFormularioCelular() {
 
       doc.setFontSize(9);
 
-      doc.text(`Página ${i} de ${paginas}`, 105, 290, { align: "center" });
+      doc.text(`Página ${i} de ${paginas}`, 196, 290, { align: "right" });
     }
 
-    doc.save(`Formulario_Celular_${celular.numero_item || "sem_numero"}.pdf`);
+    const nomeArquivo =
+  `Formulario_Celular_` +
+  `${(celular.nome_operacao || "OPERACAO")
+    .replace(/[^\w\s]/gi, "")
+    .replace(/\s+/g, "_")}` +
+  `_Alvo_${celular.numero_alvo || "0"}` +
+  `_Item_${celular.numero_item || "0"}.pdf`;
+
+doc.save(nomeArquivo);
   }
   console.log("loading:", loading);
   console.log("celular:", celular);

@@ -53,10 +53,12 @@ export default function Cautela() {
         if (erroOp) throw erroOp;
 
         const { data: cumprimento, error: erroCumpr } = await supabase
-          .from("cumprimento_mandado")
-          .select("comandante_nome, comandante_cpf, comandante_posto_graduacao")
-          .eq("operacao_id", alvo?.operacao_id)
-          .single();
+  .from("cumprimento_mandado")
+  .select(
+    "comandante_nome, comandante_cpf, comandante_posto_graduacao"
+  )
+  .eq("alvo_id", alvo.id)
+  .maybeSingle();
 
         if (erroCumpr) {
           console.warn("⚠️ Nenhum comandante encontrado para esta operação.");
@@ -107,11 +109,11 @@ export default function Cautela() {
     const logoPMPR =
       "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png";
     const logoCOGER =
-      "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/coger.png";
+      "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/brasao.png";
 
     // Cabeçalho
-    doc.addImage(logoPMPR, "PNG", 15, 10, 25, 25);
-    doc.addImage(logoCOGER, "PNG", pageWidth - 40, 10, 25, 25);
+    doc.addImage(logoPMPR, "PNG", pageWidth - 40, 10, 25, 25);
+    doc.addImage(logoCOGER, "PNG", 15, 10, 25, 25);
 
     doc.setFont("times", "bold");
     doc.setFontSize(13);
@@ -119,9 +121,7 @@ export default function Cautela() {
       align: "center",
     });
     doc.text("CORREGEDORIA-GERAL", pageWidth / 2, 27, { align: "center" });
-    doc.text("SEÇÃO DE ASSUNTOS INTERNOS", pageWidth / 2, 34, {
-      align: "center",
-    });
+   
 
     doc.line(15, 40, pageWidth - 15, 40);
 

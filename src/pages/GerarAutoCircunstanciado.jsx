@@ -36,10 +36,10 @@ async function gerarCertidao(hash, alvo, operacao, comandante) {
   const logoPMPR =
     "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png";
   const logoCOGER =
-    "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/coger.png";
+    "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/brasao.png";
 
-  certDoc.addImage(logoPMPR, "PNG", 15, 10, 25, 25);
-  certDoc.addImage(logoCOGER, "PNG", pageWidth - 40, 10, 25, 25);
+  certDoc.addImage(logoPMPR, "PNG", pageWidth - 40, 10, 25, 25);
+  certDoc.addImage(logoCOGER, "PNG", 15, 10, 25, 25);
 
   certDoc.setFont("times", "bold");
   certDoc.setFontSize(13);
@@ -49,9 +49,7 @@ async function gerarCertidao(hash, alvo, operacao, comandante) {
   certDoc.text("CORREGEDORIA-GERAL", pageWidth / 2, 27, {
     align: "center",
   });
-  certDoc.text("SEÇÃO DE ASSUNTOS INTERNOS", pageWidth / 2, 34, {
-    align: "center",
-  });
+  
 
   certDoc.line(15, 40, pageWidth - 15, 40);
 
@@ -244,10 +242,10 @@ export default function GerarAutoCircunstanciado() {
     const logoPMPR =
       "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png";
     const logoCOGER =
-      "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/coger.png";
+      "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/brasao.png";
 
-    doc.addImage(logoPMPR, "PNG", 15, 10, 25, 25);
-    doc.addImage(logoCOGER, "PNG", pageWidth - 40, 10, 25, 25);
+    doc.addImage(logoPMPR, "PNG", pageWidth - 40, 10, 25, 25);
+    doc.addImage(logoCOGER, "PNG", 15, 10, 25, 25);
 
     doc.setFont("times", "bold");
     doc.setFontSize(13);
@@ -255,9 +253,7 @@ export default function GerarAutoCircunstanciado() {
       align: "center",
     });
     doc.text("CORREGEDORIA-GERAL", pageWidth / 2, 27, { align: "center" });
-    doc.text("SEÇÃO DE ASSUNTOS INTERNOS", pageWidth / 2, 34, {
-      align: "center",
-    });
+    
     doc.line(15, 40, pageWidth - 15, 40);
 
     doc.setFontSize(12);

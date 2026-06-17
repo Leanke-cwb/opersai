@@ -259,10 +259,11 @@ export default function ConsultaAlvos() {
                   }}
                 >
                   <img
-                    src="https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png"
-                    alt="Logo Polícia Militar do Paraná"
+                  src="https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/brasao.png"
+                    alt="Logo Corregedoria"
                     style={{ height: "60px", objectFit: "contain" }}
                     crossOrigin="anonymous"
+                   
                   />
                   <div style={{ textAlign: "center", flexGrow: 1, margin: "0 20px" }}>
                     <div style={{ fontWeight: "bold", fontSize: "18px" }}>
@@ -271,13 +272,11 @@ export default function ConsultaAlvos() {
                     <div style={{ fontWeight: "bold", fontSize: "16px" }}>
                       CORREGEDORIA-GERAL
                     </div>
-                    <div style={{ fontWeight: "bold", fontSize: "16px" }}>
-                      SEÇÃO DE ASSUNTOS INTERNOS
-                    </div>
+                   
                   </div>
                   <img
-                    src="https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/coger.png"
-                    alt="Logo Corregedoria"
+                     src="https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png"
+                    alt="Logo Polícia Militar do Paraná"
                     style={{ height: "60px", objectFit: "contain" }}
                     crossOrigin="anonymous"
                   />

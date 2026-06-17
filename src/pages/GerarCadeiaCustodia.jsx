@@ -89,23 +89,66 @@ export default function GerarCadeiaCustodia() {
           (u) => u.id === selecionados[item.id]
         );
 
-        // CABEÇALHO
-        doc.setFontSize(14);
-        doc.setFont(undefined, "bold");
+       // ========================================
+// CABEÇALHO PADRÃO COGER
+// ========================================
 
-        doc.text(
-          "FORMULÁRIO DE CADEIA DE CUSTÓDIA",
-          105,
-          15,
-          { align: "center" }
-        );
+const pageWidth = doc.internal.pageSize.getWidth();
 
-        doc.setFont(undefined, "normal");
+const logoPMPR =
+  "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png";
 
-        // BORDA
-        doc.rect(10, 20, 190, 255);
+const logoCOGER =
+  "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/coger.png";
 
-        let y = 30;
+// Logos
+doc.addImage(logoCOGER, "PNG", 15, 10, 25, 25);
+doc.addImage(logoPMPR, "PNG", pageWidth - 40, 10, 25, 25);
+
+// Texto institucional
+doc.setFont("times", "bold");
+doc.setFontSize(13);
+
+doc.text(
+  "POLÍCIA MILITAR DO PARANÁ",
+  pageWidth / 2,
+  18,
+  { align: "center" }
+);
+
+doc.text(
+  "CORREGEDORIA-GERAL",
+  pageWidth / 2,
+  25,
+  { align: "center" }
+);
+
+doc.text(
+  "SEÇÃO DE ASSUNTOS INTERNOS",
+  pageWidth / 2,
+  32,
+  { align: "center" }
+);
+
+// Linha divisória
+doc.line(15, 40, pageWidth - 15, 40);
+
+// Título do documento
+doc.setFontSize(12);
+
+doc.text(
+  "FORMULÁRIO DE CADEIA DE CUSTÓDIA",
+  pageWidth / 2,
+  50,
+  { align: "center" }
+);
+
+// Moldura
+doc.rect(10, 55, 190, 220);
+
+doc.setFont("times", "normal");
+
+let y = 65;
 
         // PROCEDIMENTO
         doc.setFontSize(12);
@@ -141,18 +184,7 @@ export default function GerarCadeiaCustodia() {
         y += 6;
 
         doc.text(`Cidade: ${alvo.cidade || "-"}`, 14, y);
-        y += 6;
-
-        doc.text(
-          `Coordenadas: ${alvo.latitude || "-"} / ${
-            alvo.longitude || "-"
-          }`,
-          14,
-          y
-        );
-        y += 6;
-
-        doc.text(
+        y += 6;            doc.text(
           `Data da Coleta: ${cumprimento?.data || "-"}`,
           14,
           y
@@ -261,108 +293,100 @@ export default function GerarCadeiaCustodia() {
 
         y += 12;
 
-        // CADEIA DE CUSTÓDIA
-        doc.setFont(undefined, "bold");
-        doc.text(
-          "4. CADEIA DE CUSTÓDIA",
-          14,
-          y
-        );
+       // CADEIA DE CUSTÓDIA
+doc.setFont(undefined, "bold");
+doc.text("4. CADEIA DE CUSTÓDIA", 14, y);
 
-        y += 8;
+y += 8;
 
-        doc.setFont(undefined, "normal");
+doc.setFont(undefined, "normal");
+// 1º CUSTODIANTE
+doc.text("1º CUSTODIANTE", 14, y);
 
-        doc.text(
-          "1º CUSTODIANTE",
-          14,
-          y
-        );
+y += 6;
 
-        y += 6;
+doc.text(
+  `${cumprimento?.comandante_posto_graduacao || ""} ${
+    cumprimento?.comandante_nome || ""
+  }`,
+  14,
+  y
+);
 
-        doc.text(
-          `${cumprimento?.comandante_posto_graduacao || ""} ${
-            cumprimento?.comandante_nome || ""
-          }`,
-          14,
-          y
-        );
+y += 6;
 
-        y += 6;
+doc.text(
+  `CPF: ${cumprimento?.comandante_cpf || ""}`,
+  14,
+  y
+);
 
-        doc.text(
-          `CPF: ${
-            cumprimento?.comandante_cpf || ""
-          }`,
-          14,
-          y
-        );
+y += 8;
 
-        y += 6;
+// Linha da assinatura abaixo
+doc.line(14, y, 90, y);
 
-        doc.text(
-          "Motivo: Apreensão e arrecadação do vestígio.",
-          14,
-          y
-        );
+y += 5;
 
-        y += 12;
+doc.setFontSize(8);
 
-        doc.text(
-          "2º CUSTODIANTE",
-          14,
-          y
-        );
+doc.text(
+  "Assinatura",
+  52,
+  y,
+  { align: "center" }
+);
 
-        y += 6;
+y += 8;
 
-        doc.text(
-          `${custodiante?.posto_graduacao || ""} ${
-            custodiante?.nome || ""
-          }`,
-          14,
-          y
-        );
+// ========================================
+// 2º CUSTODIANTE
+// ========================================
 
-        y += 6;
+doc.setFontSize(10);
 
-        doc.text(
-          `CPF: ${
-            custodiante?.cpf || ""
-          }`,
-          14,
-          y
-        );
+doc.text(
+  "2º CUSTODIANTE",
+  14,
+  y
+);
 
-        y += 6;
+y += 6;
 
-        doc.text(
-          "Motivo: Recebimento para guarda e custódia do vestígio.",
-          14,
-          y
-        );
+doc.text(
+  `${custodiante?.posto_graduacao || ""} ${
+    custodiante?.nome || ""
+  }`,
+  14,
+  y
+);
 
-        // ASSINATURAS
-        y += 30;
+y += 6;
 
-        doc.line(20, y, 90, y);
-        doc.line(120, y, 190, y);
+doc.text(
+  `CPF: ${custodiante?.cpf || ""}`,
+  14,
+  y
+);
 
-        doc.text(
-          "1º CUSTODIANTE",
-          55,
-          y + 6,
-          { align: "center" }
-        );
+y += 6;
 
-        doc.text(
-          "2º CUSTODIANTE",
-          155,
-          y + 6,
-          { align: "center" }
-        );
+// Linha da assinatura abaixo
+doc.line(14, y, 90, y);
 
+y += 3;
+
+doc.setFontSize(8);
+
+doc.text(
+  "Assinatura",
+  52,
+  y,
+  { align: "center" }
+);
+
+y += 6;
+  
         // RODAPÉ
         doc.setFontSize(8);
 

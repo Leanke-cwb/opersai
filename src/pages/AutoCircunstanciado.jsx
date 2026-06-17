@@ -193,46 +193,49 @@ export default function AutoCircunstanciado() {
                       <td className="border border-gray-300 px-4 py-2 text-center">
                         {alvo.numero_alvo}
                       </td>
-                      <td className="border border-gray-300 px-4 py-2 text-center">
-                        <div className="flex flex-row flex-wrap justify-center items-center gap-2">
-                          <button
-                            onClick={() => handleAuto(alvo)}
-                            className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-                          >
-                            Auto
-                          </button>
-                          <button
-                            onClick={() => handleFormularioCelular(alvo)}
-                            className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
-                          >
-                            Celular
-                          </button>
-                          <button className="bg-purple-500 text-white px-3 py-1 rounded hover:bg-purple-600">
-                            Cumprimento
-                          </button>
-                          <button 
-                          onClick={() => handleCustodia(alvo)} className="bg-pink-500 text-white px-3 py-1 rounded hover:bg-pink-600">
-                            Custódia
-                          </button>
+                     <td className="border border-gray-300 px-4 py-2 text-center">
+  <div className="flex flex-col items-center gap-2">
+    <div className="grid grid-cols-2 gap-2">
+      <button
+        onClick={() => handleAuto(alvo)}
+        className="w-24 bg-blue-500 text-white py-1 rounded hover:bg-blue-600"
+      >
+        Auto
+      </button>
 
-                          <button
-                            onClick={() => handleCautela(alvo)}
-                            className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600"
-                          >
-                            Cautela
-                          </button>
+      <button
+        onClick={() => handleFormularioCelular(alvo)}
+        className="w-24 bg-green-500 text-white py-1 rounded hover:bg-green-600"
+      >
+        Celular
+      </button>
 
-                          {status?.encerrado ? (
-                            <span className="text-green-600 font-semibold text-sm ml-3">
-                              ✅ Encerrada
-                            </span>
-                          ) : (
-                            <span className="text-gray-500 text-sm ml-3">
-                              ⏳ Em andamento
-                            </span>
-                          )}
-                        </div>
-                      </td>
+      <button
+        onClick={() => handleCustodia(alvo)}
+        className="w-24 bg-pink-500 text-white py-1 rounded hover:bg-pink-600"
+      >
+        Custódia
+      </button>
+
+      <button
+        onClick={() => handleCautela(alvo)}
+        className="w-24 bg-yellow-500 text-white py-1 rounded hover:bg-yellow-600"
+      >
+        Cautela
+      </button>
+    </div>
+
+    {status?.encerrado ? (
+      <span className="text-green-600 font-semibold text-sm">
+        ✅ Encerrada
+      </span>
+    ) : (
+      <span className="text-gray-500 text-sm">
+        ⏳ Em andamento
+      </span>
+    )}
+  </div>
+</td>
                     </tr>
                   );
                 })}

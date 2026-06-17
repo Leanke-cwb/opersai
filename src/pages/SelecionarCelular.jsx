@@ -14,24 +14,49 @@ export default function SelecionarCelular() {
   }, []);
 
   async function carregar() {
-    const alvoId = localStorage.getItem("alvoId");
+  const alvoId = localStorage.getItem("alvoId");
 
-    const { data: alvo } = await supabase
-      .from("alvos")
-      .select("numero_alvo")
-      .eq("id", alvoId)
-      .single();
+  if (!alvoId) return;
 
-    if (!alvo) return;
+  // Busca o alvo
+  const { data: alvo, error: alvoError } = await supabase
+    .from("alvos")
+    .select("numero_alvo, operacao_id")
+    .eq("id", alvoId)
+    .single();
 
-    const { data } = await supabase
-      .from("celulares")
-      .select("*")
-      .eq("numero_alvo", alvo.numero_alvo)
-      .order("numero_item");
-
-    setCelulares(data || []);
+  if (alvoError || !alvo) {
+    console.error("Erro ao buscar alvo:", alvoError);
+    return;
   }
+
+  // Busca a operação do alvo
+  const { data: operacao, error: operacaoError } = await supabase
+    .from("operacoes")
+    .select("nome_operacao")
+    .eq("id", alvo.operacao_id)
+    .single();
+
+  if (operacaoError || !operacao) {
+    console.error("Erro ao buscar operação:", operacaoError);
+    return;
+  }
+
+  // Busca somente os celulares daquele alvo naquela operação
+  const { data, error } = await supabase
+    .from("celulares")
+    .select("*")
+    .eq("numero_alvo", String(alvo.numero_alvo))
+    .eq("nome_operacao", operacao.nome_operacao)
+    .order("numero_item");
+
+  if (error) {
+    console.error("Erro ao buscar celulares:", error);
+    return;
+  }
+
+  setCelulares(data || []);
+}
 
   function abrirCelular(celular) {
     localStorage.setItem("celularSelecionado", JSON.stringify(celular));
