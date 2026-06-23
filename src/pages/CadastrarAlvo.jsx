@@ -22,32 +22,66 @@ export default function CadastrarAlvo() {
   const [operacoes, setOperacoes] = useState([]);
   const [alvos, setAlvos] = useState([]);
   const [editandoId, setEditandoId] = useState(null);
+  const [busca, setBusca] = useState("");
+  const [usuarioLogado, setUsuarioLogado] = useState(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    async function carregarDados() {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+  const carregarDados = async () => {
 
-      if (userError || !user) return alert("Usuário não autenticado");
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
 
-      const { data: ops, error: opError } = await supabase
-        .from("operacoes")
-        .select("id, nome_operacao");
 
-      if (!opError) setOperacoes(ops);
+  if (userError || !user) {
+    alert("Usuário não autenticado");
+    return;
+  }
 
-      const { data: alvosData, error: alvoError } = await supabase
-        .from("alvos")
-        .select("*");
 
-      if (!alvoError) setAlvos(alvosData);
-    }
+  setUsuarioLogado(user);
 
-    carregarDados();
-  }, []);
+
+
+  const { data: ops, error: opError } = await supabase
+    .from("operacoes")
+    .select(`
+      id,
+      nome_operacao,
+      numero_autos,
+      user_id
+    `)
+    .order("nome_operacao");
+
+
+  if (!opError) {
+    setOperacoes(ops || []);
+  }
+
+
+
+  const { data: alvosData, error: alvoError } = await supabase
+    .from("alvos")
+    .select(`
+      *,
+      operacoes (
+        nome_operacao,
+        user_id
+      )
+    `)
+    .order("nome");
+
+
+  if (!alvoError) {
+    setAlvos(alvosData || []);
+  }
+
+};
+
+useEffect(() => {
+  carregarDados();
+}, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -115,24 +149,39 @@ export default function CadastrarAlvo() {
     return publicUrlData.publicUrl;
   };
 
-  const handleEdit = (alvo) => {
-    setForm({
-      operacao_id: alvo.operacao_id,
-      numero_alvo: alvo.numero_alvo,
-      nome: alvo.nome,
-      cpf: alvo.cpf,
-      observacao_alvo: alvo.observacao_alvo,
-      endereco: alvo.endereco,
-      bairro: alvo.bairro,
-      cidade: alvo.cidade,
-      latitude: alvo.latitude,
-      longitude: alvo.longitude,
-      observacao_residencia: alvo.observacao_residencia,
-    });
+ const handleEdit = (alvo) => {
 
-    setEditandoId(alvo.id);
-  };
 
+  if (alvo.operacoes?.user_id !== usuarioLogado?.id) {
+
+    alert(
+      "Você não pode editar alvos de uma operação compartilhada."
+    );
+
+    return;
+  }
+
+
+  setForm({
+
+    operacao_id: alvo.operacao_id,
+    numero_alvo: alvo.numero_alvo,
+    nome: alvo.nome,
+    cpf: alvo.cpf,
+    observacao_alvo: alvo.observacao_alvo,
+    endereco: alvo.endereco,
+    bairro: alvo.bairro,
+    cidade: alvo.cidade,
+    latitude: alvo.latitude,
+    longitude: alvo.longitude,
+    observacao_residencia: alvo.observacao_residencia,
+
+  });
+
+
+  setEditandoId(alvo.id);
+
+};
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -179,27 +228,30 @@ export default function CadastrarAlvo() {
         alert("Erro ao editar alvo: " + JSON.stringify(error));
         return;
       }
-      setAlvos(alvos.map((a) => (a.id === editandoId ? { ...a, ...form } : a)));
+      await carregarDados();
 
-      alert("Alvo atualizado com sucesso!");
-      setEditandoId(null);
+alert("Alvo atualizado com sucesso!");
+setEditandoId(null);
     } else {
       console.log("ID:", editandoId);
-      console.log("PAYLOAD:", payload);
-      ({ data, error } = await supabase.from("alvos").insert([
-        {
-          ...form,
-          foto_alvo_url: fotoAlvoUrl,
-          foto_residencia_url: fotoResidenciaUrl,
-          qrcode_url: qrUrl,
-          user_id: user.id,
-        },
-      ]));
+  
+      ({ error } = await supabase.from("alvos").insert([
+  {
+    ...form,
+    foto_alvo_url: fotoAlvoUrl,
+    foto_residencia_url: fotoResidenciaUrl,
+    qrcode_url: qrUrl,
+    user_id: user.id,
+  },
+]));
 
-      if (error) return alert("Erro ao cadastrar alvo: " + error.message);
+if (error) {
+  return alert("Erro ao cadastrar alvo: " + error.message);
+}
 
-      setAlvos([...alvos, data[0]]);
-      alert("Alvo cadastrado com sucesso!");
+await carregarDados();
+
+alert("Alvo cadastrado com sucesso!");
     }
 
     setForm({
@@ -220,15 +272,71 @@ export default function CadastrarAlvo() {
     setFotoResidencia(null);
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm("Deseja realmente excluir este alvo?")) return;
+ const handleDelete = async (id) => {
 
-    const { error } = await supabase.from("alvos").delete().eq("id", id);
 
-    if (error) return alert("Erro ao excluir alvo: " + error.message);
+  const alvo = alvos.find(
+    (a) => a.id === id
+  );
 
-    setAlvos(alvos.filter((a) => a.id !== id));
-  };
+
+  if (!alvo) {
+
+    alert("Alvo não encontrado");
+
+    return;
+  }
+
+
+
+  if (alvo.operacoes?.user_id !== usuarioLogado?.id) {
+
+
+    alert(
+      "Você não pode excluir alvos de uma operação compartilhada."
+    );
+
+
+    return;
+
+  }
+
+
+
+  if (!confirm("Deseja realmente excluir este alvo?")) {
+
+    return;
+
+  }
+
+
+
+  const { error } = await supabase
+    .from("alvos")
+    .delete()
+    .eq("id", id);
+
+
+
+  if (error) {
+
+    alert(
+      "Erro ao excluir alvo: " + error.message
+    );
+
+    return;
+
+  }
+
+
+
+  await carregarDados();
+
+
+};
+const alvosFiltrados = alvos.filter((alvo) =>
+  alvo.nome?.toLowerCase().includes(busca.toLowerCase())
+);
 
   return (
     <div className="p-6 max-w-3xl mx-auto bg-white rounded-xl shadow-md mt-10">
@@ -256,11 +364,15 @@ export default function CadastrarAlvo() {
             required
           >
             <option value="">Selecione a operação</option>
-            {operacoes.map((op) => (
-              <option key={op.id} value={op.id}>
-                {op.nome_operacao}
-              </option>
-            ))}
+           {
+operacoes.map((op)=>(
+
+<option key={op.id} value={op.id}>
+  {op.nome_operacao} - {op.numero_autos}
+</option>
+
+))
+}
           </select>
         </div>
 
@@ -359,34 +471,65 @@ export default function CadastrarAlvo() {
           {editandoId ? "Atualizar" : "Salvar"}
         </button>
       </form>
+<input
+  type="text"
+  placeholder="Pesquisar alvo pelo nome..."
+  value={busca}
+  onChange={(e) => setBusca(e.target.value)}
+  className="border p-2 w-full rounded mt-6"
+/>
 
       <h3 className="text-xl font-bold mt-6">Alvos Cadastrados</h3>
 
       <ul className="space-y-2">
-        {alvos.map((a) => (
+      {alvosFiltrados.map((a) => (
           <li
             key={a.id}
             className="flex justify-between items-center border p-2 rounded"
           >
             <span>
-              {a.nome} | {a.cpf}
-            </span>
+  <strong>{a.numero_alvo}</strong> - {a.nome}
 
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleEdit(a)}
-                className="bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
-              >
-                Editar
-              </button>
+  <br />
 
-              <button
-                onClick={() => handleDelete(a.id)}
-                className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
-              >
-                Excluir
-              </button>
-            </div>
+  <small className="text-gray-500">
+    {a.operacoes?.nome_operacao}
+  </small>
+</span>
+
+         <div className="flex gap-2">
+
+
+{
+a.operacoes?.user_id === usuarioLogado?.id && (
+
+<button
+ onClick={() => handleEdit(a)}
+ className="bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+>
+ Editar
+</button>
+
+)
+}
+
+
+
+{
+a.operacoes?.user_id === usuarioLogado?.id && (
+
+<button
+ onClick={() => handleDelete(a.id)}
+ className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
+>
+ Excluir
+</button>
+
+)
+}
+
+
+</div>
           </li>
         ))}
       </ul>

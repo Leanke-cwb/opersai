@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../supabase/client";
 
 const GRADUACOES_PM = [
@@ -19,26 +19,77 @@ const GRADUACOES_PM = [
 
 function formatCPF(cpf) {
   const cleaned = cpf.replace(/\D/g, "").slice(0, 11);
+
   return cleaned
     .replace(/^(\d{3})(\d)/, "$1.$2")
     .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
-    .replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d{1,2}).*/, "$1.$2.$3-$4");
+    .replace(
+      /^(\d{3})\.(\d{3})\.(\d{3})(\d{1,2}).*/,
+      "$1.$2.$3-$4"
+    );
+}
+
+function formatTelefone(telefone) {
+  const cleaned = telefone.replace(/\D/g, "").slice(0, 11);
+
+  if (cleaned.length <= 10) {
+    return cleaned.replace(
+      /^(\d{2})(\d{4})(\d{0,4}).*/,
+      "($1) $2-$3"
+    );
+  }
+
+  return cleaned.replace(
+    /^(\d{2})(\d{5})(\d{0,4}).*/,
+    "($1) $2-$3"
+  );
 }
 
 export default function Register() {
+  const [loading, setLoading] = useState(false);
+  const [nucleos, setNucleos] = useState([]);
+
   const [form, setForm] = useState({
     posto_graduacao: "",
     nome: "",
     cpf: "",
+    telefone: "",
+    nucleo_id: "",
     email: "",
     senha: "",
   });
-  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    carregarNucleos();
+  }, []);
+
+  async function carregarNucleos() {
+    const { data, error } = await supabase
+      .from("nucleos")
+      .select("*")
+      .eq("ativo", true)
+      .order("nome");
+
+    if (!error) {
+      setNucleos(data);
+    }
+  }
 
   const handleChange = (e) => {
     let { name, value } = e.target;
-    if (name === "cpf") value = formatCPF(value);
-    setForm((prev) => ({ ...prev, [name]: value }));
+
+    if (name === "cpf") {
+      value = formatCPF(value);
+    }
+
+    if (name === "telefone") {
+      value = formatTelefone(value);
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const handleRegister = async (e) => {
@@ -48,42 +99,74 @@ export default function Register() {
       !form.posto_graduacao ||
       !form.nome ||
       !form.cpf ||
+      !form.telefone ||
+      !form.nucleo_id ||
       !form.email ||
       !form.senha
     ) {
-      alert("Preencha todos os campos");
+      alert("Preencha todos os campos.");
+      return;
+    }
+
+    if (
+      !form.email
+        .toLowerCase()
+        .endsWith("@pm.pr.gov.br")
+    ) {
+      alert(
+        "Somente e-mails institucionais @pm.pr.gov.br podem realizar cadastro."
+      );
       return;
     }
 
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email: form.email,
         password: form.senha,
-        options: { emailRedirectTo: `${window.location.origin}/login` },
+
+        options: {
+          emailRedirectTo:
+            `${window.location.origin}/login`,
+
+          data: {
+            nome: form.nome,
+            cpf: form.cpf,
+            telefone: form.telefone,
+            posto_graduacao:
+              form.posto_graduacao,
+            nucleo_id: form.nucleo_id,
+          },
+        },
       });
 
       if (error) {
-        alert("Erro no cadastro: " + error.message);
+        alert(
+          "Erro ao realizar cadastro: " +
+            error.message
+        );
         return;
       }
 
-      // Salva temporariamente os dados extras no localStorage
-      localStorage.setItem(
-        "cadastro_temp",
-        JSON.stringify({
-          posto_graduacao: form.posto_graduacao,
-          nome: form.nome,
-          cpf: form.cpf,
-        })
+      alert(
+        "Cadastro realizado com sucesso.\n\nVerifique seu e-mail institucional para confirmar a conta."
       );
 
-      alert("Cadastro realizado! Verifique seu e-mail para confirmação.");
-
-      setForm({ posto_graduacao: "", nome: "", cpf: "", email: "", senha: "" });
+      setForm({
+        posto_graduacao: "",
+        nome: "",
+        cpf: "",
+        telefone: "",
+        nucleo_id: "",
+        email: "",
+        senha: "",
+      });
     } catch (err) {
-      alert("Erro inesperado: " + (err.message || "Tente novamente."));
+      alert(
+        "Erro inesperado: " +
+          (err.message || "Tente novamente.")
+      );
     } finally {
       setLoading(false);
     }
@@ -91,8 +174,14 @@ export default function Register() {
 
   return (
     <div className="max-w-md mx-auto mt-10 p-6 border rounded shadow">
-      <h2 className="text-2xl font-bold mb-4">Cadastro</h2>
-      <form onSubmit={handleRegister} className="space-y-4">
+      <h2 className="text-2xl font-bold mb-4">
+        Cadastro
+      </h2>
+
+      <form
+        onSubmit={handleRegister}
+        className="space-y-4"
+      >
         <select
           name="posto_graduacao"
           value={form.posto_graduacao}
@@ -100,7 +189,10 @@ export default function Register() {
           className="w-full border p-2 rounded"
           required
         >
-          <option value="">Selecione a Graduação</option>
+          <option value="">
+            Selecione a Graduação
+          </option>
+
           {GRADUACOES_PM.map((g) => (
             <option key={g} value={g}>
               {g}
@@ -117,25 +209,59 @@ export default function Register() {
           className="w-full border p-2 rounded"
           required
         />
+
         <input
           type="text"
           name="cpf"
-          placeholder="CPF (000.000.000-00)"
+          placeholder="CPF"
           value={form.cpf}
           onChange={handleChange}
           maxLength={14}
           className="w-full border p-2 rounded"
           required
         />
+
+        <input
+          type="text"
+          name="telefone"
+          placeholder="Telefone"
+          value={form.telefone}
+          onChange={handleChange}
+          className="w-full border p-2 rounded"
+          required
+        />
+
+        <select
+          name="nucleo_id"
+          value={form.nucleo_id}
+          onChange={handleChange}
+          className="w-full border p-2 rounded"
+          required
+        >
+          <option value="">
+            Selecione o Núcleo
+          </option>
+
+          {nucleos.map((nucleo) => (
+            <option
+              key={nucleo.id}
+              value={nucleo.id}
+            >
+              {nucleo.nome}
+            </option>
+          ))}
+        </select>
+
         <input
           type="email"
           name="email"
-          placeholder="E-mail"
+          placeholder="E-mail Institucional"
           value={form.email}
           onChange={handleChange}
           className="w-full border p-2 rounded"
           required
         />
+
         <input
           type="password"
           name="senha"
@@ -151,7 +277,9 @@ export default function Register() {
           disabled={loading}
           className="w-full bg-blue-600 text-white p-2 rounded"
         >
-          {loading ? "Cadastrando..." : "Cadastrar"}
+          {loading
+            ? "Cadastrando..."
+            : "Cadastrar"}
         </button>
       </form>
     </div>

@@ -113,6 +113,7 @@ export default function GerarAutoCircunstanciado() {
   const [itens, setItens] = useState([]);
   const [comandante, setComandante] = useState(null);
   const [policiais, setPoliciais] = useState([]);
+  const [testemunhas, setTestemunhas] = useState([]);
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
@@ -185,6 +186,70 @@ export default function GerarAutoCircunstanciado() {
           }
         }
         setPoliciais(policiaisLista);
+        // ===============================
+// BUSCAR TESTEMUNHAS
+// ===============================
+
+const { data: testemunhasData, error: testemunhasError } =
+  await supabase
+    .from("testemunhas")
+    .select("*")
+    .eq("alvo_id", alvoId);
+
+
+if (testemunhasError) {
+
+  console.error(
+    "Erro ao buscar testemunhas:",
+    testemunhasError
+  );
+
+}
+
+
+// Buscar assinatura no Storage
+
+const testemunhasComAssinatura = await Promise.all(
+
+  (testemunhasData || []).map(async (testemunha) => {
+
+
+    let assinaturaUrl = null;
+
+
+    if (testemunha.assinatura_foto) {
+
+
+      const { data } = await supabase.storage
+
+        .from("assinaturas_testemunhas")
+
+        .createSignedUrl(
+          testemunha.assinatura_foto,
+          31536000
+        );
+
+
+      assinaturaUrl = data?.signedUrl || null;
+
+    }
+
+
+    return {
+
+      ...testemunha,
+
+      assinaturaUrl
+
+    };
+
+
+  })
+
+);
+
+
+setTestemunhas(testemunhasComAssinatura);
 
         const { data: itensData } = await supabase
           .from("auto_itens")
@@ -285,7 +350,7 @@ export default function GerarAutoCircunstanciado() {
     const texto = `INVESTIGADO: ${alvo?.nome || "—"}
 Aos ${dataCumprimento}, em cumprimento ao MANDADO DE BUSCA E APREENSÃO expedido junto aos Autos nº ${
       operacao?.numero_autos || "—"
-    }, da Vara ${operacao?.vara || "—"} /PR, compareceu no imóvel, situado à ${
+    }, da ${operacao?.vara || "—"} /PR, compareceu no imóvel, situado à ${
       alvo?.endereco || "—"
     }, ${alvo?.cidade || "—"}, na presença das testemunhas.
 
@@ -388,12 +453,165 @@ ${justificativaTexto}`;
       doc.setFont("times", "bold");
       doc.text("Policiais Executores do Mandado de Busca", 14, posTabela);
       autoTable(doc, {
-        startY: posTabela + 8,
-        head: [["ID", "Posto", "Nome Completo", "CPF"]],
-        body: policiais.map((p) => [p.id, p.posto, p.nome_completo, p.cpf]),
-        theme: "grid",
-        headStyles: { fillColor: [230, 230, 230] },
-      });
+
+  startY: posTabela + 8,
+
+  head: [
+    [
+      "ID",
+      "Posto",
+      "Nome Completo",
+      "CPF"
+    ]
+  ],
+
+  body: policiais.map((p) => [
+
+    p.id,
+
+    p.posto,
+
+    p.nome_completo,
+
+    p.cpf
+
+  ]),
+
+  theme: "grid",
+
+  headStyles: {
+    fillColor: [230, 230, 230]
+  },
+
+});
+
+
+// ===============================
+// TESTEMUNHAS
+// ===============================
+
+
+const posTestemunhas =
+  doc.lastAutoTable.finalY + 25;
+
+
+doc.setFont("times", "bold");
+
+doc.text(
+  "Testemunas presentes no Cumprimento do Mandado de Busca",
+  14,
+  posTestemunhas
+);
+
+
+
+autoTable(doc, {
+
+  startY: posTestemunhas + 8,
+
+  head: [
+    [
+      "Nome Completo",
+      "CPF",
+      "Assinatura"
+    ]
+  ],
+
+  body: testemunhas.map((t)=>[
+
+    t.nome_completo || "—",
+
+    t.cpf || "—",
+
+    ""
+
+  ]),
+
+  theme:"grid",
+
+  headStyles:{
+    fillColor:[230,230,230]
+  },
+
+
+  // mesmo padrão da tabela de itens
+  styles:{
+    cellPadding:2
+  },
+
+
+  columnStyles:{
+
+    0:{
+      cellWidth:70
+    },
+
+    1:{
+      cellWidth:45
+    },
+
+    2:{
+      cellWidth:60
+    }
+
+  },
+
+
+  didParseCell:(data)=>{
+
+    if(
+      data.section==="body" &&
+      data.column.index===2
+    ){
+
+      data.cell.styles.minCellHeight = 25;
+
+    }
+
+  },
+
+
+  didDrawCell:(data)=>{
+
+    if(
+
+      data.section==="body" &&
+
+      data.column.index===2
+
+    ){
+
+      const testemunha =
+        testemunhas[data.row.index];
+
+
+      if(testemunha?.assinaturaUrl){
+
+
+        doc.addImage(
+
+          testemunha.assinaturaUrl,
+
+          "PNG",
+
+          data.cell.x + 5,
+
+          data.cell.y + 2,
+
+          35,
+
+          20
+
+        );
+
+
+      }
+
+    }
+
+  }
+
+});
     }
 
     const pdfArrayBuffer = doc.output("arraybuffer");
