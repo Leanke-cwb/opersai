@@ -34,9 +34,9 @@ export default function ProtectedRoute({
       return;
     }
 
-    setAutorizado(
-      perfisPermitidos.includes(data.perfil)
-    );
+   setAutorizado(
+  (perfisPermitidos ?? []).includes(data.perfil)
+);
 
     setLoading(false);
   }

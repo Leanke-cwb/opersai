@@ -77,10 +77,14 @@ export default function App() {
 
         {/* Administração */}
         
-        <Route
+      <Route
   path="/admin"
   element={
-    <ProtectedRoute perfilPermitido="admin">
+    <ProtectedRoute
+      perfisPermitidos={[
+        "admin"
+      ]}
+    >
       <AdminUsuarios />
     </ProtectedRoute>
   }
