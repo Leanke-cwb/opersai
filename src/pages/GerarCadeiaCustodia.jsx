@@ -16,6 +16,7 @@ export default function GerarCadeiaCustodia() {
   async function gerarPDF() {
     try {
       const alvoId = localStorage.getItem("alvoId");
+console.log("ID DO ALVO RECEBIDO:", alvoId);
 
       const selecionados = JSON.parse(
         localStorage.getItem("custodiaSelecionados") || "{}"
@@ -41,11 +42,14 @@ export default function GerarCadeiaCustodia() {
         .single();
 
       // AUTO
-      const { data: auto } = await supabase
-        .from("auto_circunstanciado")
-        .select("*")
-        .eq("alvo_id", alvoId)
-        .single();
+      const { data: auto, error: erroAuto } = await supabase
+  .from("auto_circunstanciado")
+  .select("*")
+  .eq("alvo_id", alvoId)
+  .maybeSingle();
+
+console.log("AUTO NO PDF:", auto);
+console.log("ERRO AUTO PDF:", erroAuto);
 
       if (!auto) {
         alert("Auto Circunstanciado não encontrado.");
