@@ -30,20 +30,23 @@ async function carregarOperacoes() {
 
   if(!user) return;
 
-  setUsuarioLogado(user);
-
+  
   const {data:usuario,error:erroUsuario}=
 
   await supabase
   .from("usuarios")
-  .select("nucleo_id")
+  .select("nucleo_id, perfil")
   .eq("user_id",user.id)
   .single();
 
 
   if(erroUsuario || !usuario)
     return;
-
+setUsuarioLogado({
+  ...user,
+  perfil: usuario.perfil,
+  nucleo_id: usuario.nucleo_id
+});
 
 
   // Operações próprias + compartilhadas
@@ -72,7 +75,15 @@ async function carregarOperacoes() {
 
 
 
-  const filtradas = data.filter((op)=>{
+  let filtradas = data;
+
+
+// ADMIN VÊ TODAS AS OPERAÇÕES
+
+if(usuario.perfil !== "admin"){
+
+
+  filtradas = data.filter((op)=>{
 
 
     // operação do próprio núcleo
@@ -92,8 +103,12 @@ async function carregarOperacoes() {
   });
 
 
+}
 
-  setOperacoes(filtradas || []);
+
+setOperacoes(filtradas || []);
+
+
 
 
 }
@@ -212,7 +227,8 @@ async function carregarOperacoes() {
 
   const handleEdit = (operacao)=>{
 
-    if(operacao.user_id !== usuarioLogado?.id){
+
+if(!podeAlterarOperacao(operacao)){
 
 alert(
 "Você não tem permissão para editar esta operação."
@@ -223,21 +239,20 @@ return;
 }
 
 
-    setForm({
 
-      nome_operacao: operacao.nome_operacao,
-      numero_autos: operacao.numero_autos,
-      vara: operacao.vara,
+setForm({
 
-    });
+nome_operacao: operacao.nome_operacao,
+numero_autos: operacao.numero_autos,
+vara: operacao.vara,
 
-
-    setEditandoId(operacao.id);
+});
 
 
-  };
+setEditandoId(operacao.id);
 
 
+};
 
 
 
@@ -513,11 +528,43 @@ if(compartilhamentos.length > 0){
 
 
   };
+const podeAlterarOperacao = (op)=>{
+
+
+  // ADMIN TEM PODER TOTAL
+
+  if(usuarioLogado?.perfil === "admin"){
+    return true;
+  }
 
 
 
+  // CHEFE SÓ ALTERA OPERAÇÕES DO SEU PRÓPRIO NÚCLEO
+
+  if(
+    usuarioLogado?.perfil === "chefe_nucleo" &&
+    usuarioLogado.nucleo_id === op.nucleo_id
+  ){
+    return true;
+  }
 
 
+
+  // USUÁRIO SÓ ALTERA O QUE ELE CRIOU
+
+  if(
+    usuarioLogado?.perfil === "usuario" &&
+    usuarioLogado.nucleo_id === op.nucleo_id &&
+    op.user_id === usuarioLogado.id
+  ){
+    return true;
+  }
+
+
+
+  return false;
+
+};
 
 
 return (
@@ -713,7 +760,7 @@ className="border p-3 mt-2 flex justify-between"
 
 
 {
-op.user_id === usuarioLogado?.id && (
+podeAlterarOperacao(op) && (
 
 <button
 
@@ -731,9 +778,8 @@ Editar
 }
 
 
-
 {
-op.user_id === usuarioLogado?.id && (
+podeAlterarOperacao(op) && (
 
 <button
 
@@ -749,7 +795,6 @@ Excluir
 
 )
 }
-
 
 </div>
 
