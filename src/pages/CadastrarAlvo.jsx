@@ -40,8 +40,30 @@ export default function CadastrarAlvo() {
   }
 
 
-  setUsuarioLogado(user);
+  const { data: usuarioPerfil, error: perfilError } = await supabase
+  .from("usuarios")
+  .select("perfil,nucleo_id")
+  .eq("user_id", user.id)
+  .single();
 
+
+if(perfilError){
+
+  console.log(perfilError);
+  return;
+
+}
+
+
+setUsuarioLogado({
+
+  ...user,
+
+  perfil: usuarioPerfil.perfil,
+
+  nucleo_id: usuarioPerfil.nucleo_id
+
+});
 
 
   const { data: ops, error: opError } = await supabase
@@ -50,7 +72,8 @@ export default function CadastrarAlvo() {
       id,
       nome_operacao,
       numero_autos,
-      user_id
+      user_id,
+      nucleo_id
     `)
     .order("nome_operacao");
 
@@ -67,7 +90,8 @@ export default function CadastrarAlvo() {
       *,
       operacoes (
         nome_operacao,
-        user_id
+        user_id,
+        nucleo_id
       )
     `)
     .order("nome");
@@ -148,18 +172,64 @@ useEffect(() => {
 
     return publicUrlData.publicUrl;
   };
+const podeAlterarAlvo = (alvo)=>{
+
+
+  // ADMIN PODE TUDO
+
+  if(usuarioLogado?.perfil === "admin"){
+
+    return true;
+
+  }
+
+
+
+  // CHEFE DO NÚCLEO
+
+  if(
+    usuarioLogado?.perfil === "chefe_nucleo" &&
+    usuarioLogado.nucleo_id === alvo.operacoes?.nucleo_id
+  ){
+
+    return true;
+
+  }
+
+
+
+  // CRIADOR DA OPERAÇÃO
+
+  if(
+    alvo.operacoes?.user_id === usuarioLogado?.id
+  ){
+
+    return true;
+
+  }
+
+
+
+  return false;
+
+
+};
 
  const handleEdit = (alvo) => {
 
 
-  if (alvo.operacoes?.user_id !== usuarioLogado?.id) {
+if(!podeAlterarAlvo(alvo)){
 
-    alert(
-      "Você não pode editar alvos de uma operação compartilhada."
-    );
 
-    return;
-  }
+alert(
+"Você não tem permissão para editar este alvo."
+);
+
+
+return;
+
+
+}
 
 
   setForm({
@@ -289,7 +359,7 @@ alert("Alvo cadastrado com sucesso!");
 
 
 
-  if (alvo.operacoes?.user_id !== usuarioLogado?.id) {
+  if(!podeAlterarAlvo(alvo)){
 
 
     alert(
@@ -501,31 +571,39 @@ operacoes.map((op)=>(
 
 
 {
-a.operacoes?.user_id === usuarioLogado?.id && (
+
+podeAlterarAlvo(a) && (
 
 <button
  onClick={() => handleEdit(a)}
  className="bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
 >
- Editar
+
+Editar
+
 </button>
 
 )
+
 }
 
 
 
 {
-a.operacoes?.user_id === usuarioLogado?.id && (
+
+podeAlterarAlvo(a) && (
 
 <button
  onClick={() => handleDelete(a.id)}
  className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
 >
- Excluir
+
+Excluir
+
 </button>
 
 )
+
 }
 
 
