@@ -263,10 +263,12 @@ const sanitizarNomeArquivo = (texto) => {
     .toUpperCase();
 };
 
-const nomeOperacao = sanitizarNomeArquivo(dados?.operacao?.nome);
+const nomeOperacao = sanitizarNomeArquivo(
+  dados?.operacao?.nome_operacao
+);
 const numeroAlvo = dados?.alvo?.numero_alvo || "0";
 
-doc.save(`termo_cautela_${nomeOperacao}_${numeroAlvo}.pdf`);
+doc.save(`termo_cautela_${nomeOperacao}_alvo_${numeroAlvo}.pdf`);
   };
 
   if (carregando) {
