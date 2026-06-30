@@ -103,7 +103,7 @@ const logoPMPR =
   "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png";
 
 const logoCOGER =
-  "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/coger.png";
+  "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/brasao.png";
 
 // Logos
 doc.addImage(logoCOGER, "PNG", 15, 10, 25, 25);
