@@ -252,7 +252,21 @@ Os materiais, arrecadados pelo(a) ${dados?.posto_graduacao || ""} ${
       }
     );
 
-    doc.save("termo_cautela.pdf");
+    // Remove caracteres inválidos do nome do arquivo
+const sanitizarNomeArquivo = (texto) => {
+  return String(texto || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // remove acentos
+    .replace(/[^\w\s-]/g, "")        // remove caracteres especiais
+    .trim()
+    .replace(/\s+/g, "_")            // espaços -> _
+    .toUpperCase();
+};
+
+const nomeOperacao = sanitizarNomeArquivo(dados?.operacao?.nome);
+const numeroAlvo = dados?.alvo?.numero_alvo || "0";
+
+doc.save(`termo_cautela_${nomeOperacao}_${numeroAlvo}.pdf`);
   };
 
   if (carregando) {
