@@ -21,6 +21,8 @@ import GerarCadeiaCustodia from "./pages/GerarCadeiaCustodia";
 
 import AdminUsuarios from "./pages/AdminUsuarios";
 import ChefeNucleo from "./pages/ChefeNucleo";
+import ApoiosExternos from "./pages/ApoiosExternos";
+import DetalhesApoioExterno from "./pages/DetalhesApoioExterno";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -41,6 +43,13 @@ export default function App() {
         {/* Alvos */}
         <Route path="/alvo" element={<CadastrarAlvo />} />
         <Route path="/consulta-alvos" element={<ConsultaAlvos />} />
+
+        {/* Apoios Externos */}
+        <Route path="/apoios-externos" element={<ApoiosExternos />} />
+        <Route
+          path="/apoios-externos/:id"
+          element={<DetalhesApoioExterno />}
+        />
 
         {/* Auto Circunstanciado */}
         <Route

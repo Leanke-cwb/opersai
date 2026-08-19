@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { supabase } from "../supabase/client";
 
 export default function GerarFormularioCelular() {
   const navigate = useNavigate();
@@ -13,81 +12,30 @@ export default function GerarFormularioCelular() {
   const [celular, setCelular] = useState(null);
 
   useEffect(() => {
-    async function carregarCelular() {
-      try {
-        setLoading(true);
+    try {
+      setLoading(true);
 
-        const celularStorage = localStorage.getItem("celularSelecionado");
+      const celularStorage = localStorage.getItem("celularSelecionado");
 
-        console.log("localStorage celularSelecionado:", celularStorage);
+      console.log("localStorage celularSelecionado:", celularStorage);
 
-        if (!celularStorage) {
-          console.error("Nenhum celular encontrado no localStorage.");
-          return;
-        }
-
-        const celularData = JSON.parse(celularStorage);
-
-        console.log("Celular carregado:", celularData);
-
-        let lacre = "";
-
-        // Busca principal: o celular já possui item_id, que referencia auto_itens.id.
-        if (celularData.item_id) {
-          const { data: item, error: itemError } = await supabase
-            .from("auto_itens")
-            .select("lacre")
-            .eq("id", celularData.item_id)
-            .maybeSingle();
-
-          if (itemError) {
-            console.error("Erro ao buscar lacre pelo item_id:", itemError);
-          } else {
-            lacre = item?.lacre || "";
-          }
-        }
-
-        // Compatibilidade para registros antigos que eventualmente não tenham item_id.
-        if (!lacre) {
-          const alvoId = localStorage.getItem("alvoId");
-
-          if (
-            alvoId &&
-            celularData.operacao_id &&
-            celularData.numero_item != null
-          ) {
-            const { data: itemAntigo, error: itemAntigoError } = await supabase
-              .from("auto_itens")
-              .select("lacre")
-              .eq("operacao_id", celularData.operacao_id)
-              .eq("alvo_id", alvoId)
-              .eq("numero_item", celularData.numero_item)
-              .maybeSingle();
-
-            if (itemAntigoError) {
-              console.error(
-                "Erro ao buscar lacre por operação/alvo/item:",
-                itemAntigoError
-              );
-            } else {
-              lacre = itemAntigo?.lacre || "";
-            }
-          }
-        }
-
-        setCelular({
-          ...celularData,
-          lacre,
-        });
-      } catch (err) {
-        console.error("Erro ao carregar celular:", err);
-        alert("Erro ao carregar os dados do celular.");
-      } finally {
+      if (!celularStorage) {
+        console.error("Nenhum celular encontrado no localStorage.");
         setLoading(false);
+        return;
       }
-    }
 
-    carregarCelular();
+      const celularData = JSON.parse(celularStorage);
+
+      console.log("Celular carregado:", celularData);
+
+      setCelular(celularData);
+    } catch (err) {
+      console.error("Erro ao carregar celular:", err);
+      alert("Erro ao carregar os dados do celular.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   function valorOuNaoFornecido(valor) {
@@ -175,7 +123,7 @@ export default function GerarFormularioCelular() {
         ["Alvo", celular.nome_alvo || ""],
         ["Número do Alvo", celular.numero_alvo || ""],
         ["Número do Item", celular.numero_item || ""],
-        ["Número do Lacre", celular.lacre || ""],
+        ["Número do Lacre", celular.lacre || "-"],
 
         ["Marca", celular.marca || ""],
         ["Modelo", celular.modelo || ""],
@@ -266,7 +214,7 @@ doc.save(nomeArquivo);
 
           <Campo titulo="Número do Item" valor={celular.numero_item} />
 
-          <Campo titulo="Número do Lacre" valor={celular.lacre} />
+          <Campo titulo="Número do Lacre" valor={celular.lacre || "-"} />
 
           <Campo titulo="Marca" valor={celular.marca} />
 

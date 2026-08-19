@@ -58,8 +58,53 @@ export default function SelecionarCelular() {
   setCelulares(data || []);
 }
 
-  function abrirCelular(celular) {
-    localStorage.setItem("celularSelecionado", JSON.stringify(celular));
+  async function abrirCelular(celular) {
+    let lacre = "";
+
+    try {
+      if (celular.item_id) {
+        const { data: item, error } = await supabase
+          .from("auto_itens")
+          .select("lacre")
+          .eq("id", celular.item_id)
+          .maybeSingle();
+
+        if (error) {
+          console.error("Erro ao buscar lacre do item:", error);
+        } else {
+          lacre = item?.lacre || "";
+        }
+      } else {
+        const alvoId = localStorage.getItem("alvoId");
+
+        if (alvoId && celular.numero_item) {
+          const { data: itens, error } = await supabase
+            .from("auto_itens")
+            .select("lacre")
+            .eq("alvo_id", alvoId)
+            .eq("numero_item", celular.numero_item)
+            .limit(1);
+
+          if (error) {
+            console.error("Erro ao buscar lacre pelo número do item:", error);
+          } else {
+            lacre = itens?.[0]?.lacre || "";
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao carregar lacre:", err);
+    }
+
+    const celularComLacre = {
+      ...celular,
+      lacre,
+    };
+
+    localStorage.setItem(
+      "celularSelecionado",
+      JSON.stringify(celularComLacre)
+    );
 
     navigate("/gerar-formulario-celular");
   }

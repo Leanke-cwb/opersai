@@ -55,7 +55,7 @@ export default function Cautela() {
         const { data: cumprimento, error: erroCumpr } = await supabase
   .from("cumprimento_mandado")
   .select(
-    "comandante_nome, comandante_cpf, comandante_posto_graduacao"
+    "comandante_nome, comandante_cpf, comandante_posto_graduacao, policiais_apoio"
   )
   .eq("alvo_id", alvo.id)
   .maybeSingle();
@@ -77,6 +77,9 @@ export default function Cautela() {
           comandante,
           cpf_comandante,
           posto_graduacao,
+          policiais_apoio: Array.isArray(cumprimento?.policiais_apoio)
+            ? cumprimento.policiais_apoio
+            : [],
           materiais,
         });
       } catch (err) {
@@ -221,8 +224,36 @@ Os materiais, arrecadados pelo(a) ${dados?.posto_graduacao || ""} ${
       margin: { left: 15, right: 15 },
     });
 
+    let yFinal = doc.lastAutoTable?.finalY || tabelaStartY + 50;
+
+    if (dados?.policiais_apoio?.length > 0) {
+      doc.setFont("times", "bold");
+      doc.setFontSize(11);
+      doc.text("Policiais de Apoio", 15, yFinal + 10);
+
+      autoTable(doc, {
+        startY: yFinal + 14,
+        head: [["Posto/Graduação", "Nome Completo", "CPF", "Unidade"]],
+        body: dados.policiais_apoio.map((policial) => [
+          policial?.posto_graduacao || "-",
+          policial?.nome || "-",
+          policial?.cpf || policial?.rg_matricula || "-",
+          policial?.unidade || "-",
+        ]),
+        styles: {
+          font: "times",
+          fontSize: 9,
+          cellPadding: 3,
+        },
+        headStyles: { fillColor: [220, 220, 220] },
+        theme: "grid",
+        margin: { left: 15, right: 15 },
+      });
+
+      yFinal = doc.lastAutoTable?.finalY || yFinal + 35;
+    }
+
     // Dados do recebedor
-    const yFinal = doc.lastAutoTable?.finalY || tabelaStartY + 50;
     const gapAfterTable = 16;
     doc.setFontSize(11);
     doc.text(
@@ -430,6 +461,36 @@ doc.save(`termo_cautela_${nomeOperacao}_alvo_${numeroAlvo}.pdf`);
           )}
         </tbody>
       </table>
+
+      {dados?.policiais_apoio?.length > 0 && (
+        <>
+          <h3 className="font-semibold mb-2">Policiais de Apoio:</h3>
+          <table className="w-full border mb-6 text-sm">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="border p-2">Posto/Graduação</th>
+                <th className="border p-2">Nome Completo</th>
+                <th className="border p-2">CPF</th>
+                <th className="border p-2">Unidade</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dados.policiais_apoio.map((policial, index) => (
+                <tr key={policial?.id || index}>
+                  <td className="border p-2">
+                    {policial?.posto_graduacao || "-"}
+                  </td>
+                  <td className="border p-2">{policial?.nome || "-"}</td>
+                  <td className="border p-2">
+                    {policial?.cpf || policial?.rg_matricula || "-"}
+                  </td>
+                  <td className="border p-2">{policial?.unidade || "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
 
       <button
         onClick={gerarPDF}

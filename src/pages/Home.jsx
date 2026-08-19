@@ -29,6 +29,12 @@ export default function Home() {
             Consultar Alvos
           </button>
           <button
+            onClick={() => navigate("/apoios-externos")}
+            className="w-full bg-orange-500 text-white py-2 px-4 rounded hover:bg-orange-600 transition"
+          >
+            Apoios Externos
+          </button>
+          <button
             onClick={() => navigate("/auto-circunstanciado")}
             className="w-full bg-purple-500 text-white py-2 px-4 rounded hover:bg-purple-600 transition"
           >

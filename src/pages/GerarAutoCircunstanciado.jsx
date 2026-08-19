@@ -150,7 +150,7 @@ export default function GerarAutoCircunstanciado() {
         const { data: cumprimentoData } = await supabase
           .from("cumprimento_mandado")
           .select(
-            "comandante_nome, comandante_posto_graduacao, comandante_cpf, integrantes",
+            "comandante_nome, comandante_posto_graduacao, comandante_cpf, integrantes, policiais_apoio",
           )
           .eq("alvo_id", alvoId)
           .maybeSingle();
@@ -165,7 +165,9 @@ export default function GerarAutoCircunstanciado() {
             id: 1,
             posto: cumprimentoData.comandante_posto_graduacao || "—",
             nome_completo: cumprimentoData.comandante_nome || "—",
-            cpf: cumprimentoData.comandante_cpf || "—",
+            identificacao: cumprimentoData.comandante_cpf || "—",
+            unidade: "—",
+            funcao: "Comandante",
           });
 
           const integrantes = cumprimentoData.integrantes || [];
@@ -181,9 +183,26 @@ export default function GerarAutoCircunstanciado() {
               id: i + 2,
               posto: userData?.posto_graduacao || "—",
               nome_completo: userData?.nome || "—",
-              cpf: userData?.cpf || "—",
+              identificacao: userData?.cpf || "—",
+              unidade: "—",
+              funcao: "Integrante",
             });
           }
+
+          const apoios = Array.isArray(cumprimentoData.policiais_apoio)
+            ? cumprimentoData.policiais_apoio
+            : [];
+
+          apoios.forEach((apoio) => {
+            policiaisLista.push({
+              id: policiaisLista.length + 1,
+              posto: apoio?.posto_graduacao || "—",
+              nome_completo: apoio?.nome || "—",
+              identificacao: apoio?.cpf || apoio?.rg_matricula || "—",
+              unidade: apoio?.unidade || "—",
+              funcao: "Apoio",
+            });
+          });
         }
         setPoliciais(policiaisLista);
         // ===============================
@@ -461,7 +480,9 @@ ${justificativaTexto}`;
       "ID",
       "Posto",
       "Nome Completo",
-      "CPF"
+      "CPF",
+      "Unidade",
+      "Função"
     ]
   ],
 
@@ -473,11 +494,29 @@ ${justificativaTexto}`;
 
     p.nome_completo,
 
-    p.cpf
+    p.identificacao,
+
+    p.unidade,
+
+    p.funcao
 
   ]),
 
   theme: "grid",
+
+  styles: {
+    fontSize: 7,
+    cellPadding: 1.5,
+  },
+
+  columnStyles: {
+    0: { cellWidth: 8 },
+    1: { cellWidth: 18 },
+    2: { cellWidth: 50 },
+    3: { cellWidth: 35 },
+    4: { cellWidth: 40 },
+    5: { cellWidth: 25 },
+  },
 
   headStyles: {
     fillColor: [230, 230, 230]
@@ -746,7 +785,7 @@ ${encerramento?.justificativa?.trim() || "—"}`;
             <thead>
               <tr>
                 <th
-                  colSpan={4}
+                  colSpan={6}
                   className="text-center bg-gray-200 py-2 border border-gray-400"
                 >
                   Policiais Executores do Mandado de Busca
@@ -758,7 +797,11 @@ ${encerramento?.justificativa?.trim() || "—"}`;
                 <th className="border border-gray-400 px-2 py-1">
                   Nome Completo
                 </th>
-                <th className="border border-gray-400 px-2 py-1">CPF</th>
+                <th className="border border-gray-400 px-2 py-1">
+                  CPF
+                </th>
+                <th className="border border-gray-400 px-2 py-1">Unidade</th>
+                <th className="border border-gray-400 px-2 py-1">Função</th>
               </tr>
             </thead>
             <tbody>
@@ -771,7 +814,15 @@ ${encerramento?.justificativa?.trim() || "—"}`;
                   <td className="border border-gray-400 px-2 py-1">
                     {p.nome_completo}
                   </td>
-                  <td className="border border-gray-400 px-2 py-1">{p.cpf}</td>
+                  <td className="border border-gray-400 px-2 py-1">
+                    {p.identificacao}
+                  </td>
+                  <td className="border border-gray-400 px-2 py-1">
+                    {p.unidade}
+                  </td>
+                  <td className="border border-gray-400 px-2 py-1 font-semibold">
+                    {p.funcao}
+                  </td>
                 </tr>
               ))}
             </tbody>
