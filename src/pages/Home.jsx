@@ -112,6 +112,15 @@ export default function Home() {
 
           {!carregandoPerfil && podeEditarUsuarios && (
             <button
+              onClick={() => navigate("/auditoria")}
+              className="w-full bg-teal-700 text-white py-2 px-4 rounded hover:bg-teal-800 transition"
+            >
+              Auditoria
+            </button>
+          )}
+
+          {!carregandoPerfil && podeEditarUsuarios && (
+            <button
               onClick={abrirEdicaoUsuarios}
               className="w-full bg-slate-700 text-white py-2 px-4 rounded hover:bg-slate-800 transition"
             >

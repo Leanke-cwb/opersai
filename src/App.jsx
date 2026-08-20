@@ -23,6 +23,7 @@ import AdminUsuarios from "./pages/AdminUsuarios";
 import ChefeNucleo from "./pages/ChefeNucleo";
 import ApoiosExternos from "./pages/ApoiosExternos";
 import DetalhesApoioExterno from "./pages/DetalhesApoioExterno";
+import Auditoria from "./pages/Auditoria";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -82,6 +83,16 @@ export default function App() {
         <Route
           path="/gerar-cadeia-custodia"
           element={<GerarCadeiaCustodia />}
+        />
+
+        {/* Auditoria */}
+        <Route
+          path="/auditoria"
+          element={
+            <ProtectedRoute perfisPermitidos={["admin", "chefe_nucleo"]}>
+              <Auditoria />
+            </ProtectedRoute>
+          }
         />
 
         {/* Administração */}
