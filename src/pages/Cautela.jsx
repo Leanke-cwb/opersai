@@ -3,6 +3,22 @@ import { supabase } from "../supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useNavigate } from "react-router-dom";
+import {
+  ESTILO_TABELA_IMPRESSAO,
+  adicionarRodapePaginas,
+  escreverParagrafoFormal,
+  garantirEspaco,
+  tituloSecao,
+} from "../utils/pdfFormal";
+
+function textoPDF(valor, padrao = "-") {
+  const texto =
+    valor === null || valor === undefined || String(valor).trim() === ""
+      ? padrao
+      : String(valor).trim();
+
+  return texto.toLocaleUpperCase("pt-BR");
+}
 
 export default function Cautela() {
   const navigate = useNavigate();
@@ -107,14 +123,12 @@ export default function Cautela() {
     const doc = new jsPDF();
     const dataAtual = formatarDataPorExtenso();
     const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
 
     const logoPMPR =
       "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png";
     const logoCOGER =
       "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/brasao.png";
 
-    // Cabeçalho
     doc.addImage(logoPMPR, "PNG", pageWidth - 40, 10, 25, 25);
     doc.addImage(logoCOGER, "PNG", 15, 10, 25, 25);
 
@@ -124,182 +138,147 @@ export default function Cautela() {
       align: "center",
     });
     doc.text("CORREGEDORIA-GERAL", pageWidth / 2, 27, { align: "center" });
-   
-
+    doc.setLineWidth(0.25);
     doc.line(15, 40, pageWidth - 15, 40);
 
-    // Título
     doc.setFontSize(12);
     doc.text("TERMO DE ENTREGA DE MATERIAL", pageWidth / 2, 50, {
       align: "center",
     });
 
-    // Texto justificado com recuo de parágrafo
-    doc.setFont("times", "normal");
-    doc.setFontSize(12);
+    let y = 62;
 
-    const texto = `Aos ${dataAtual}, faço a entrega dos materiais relacionados e discriminados a seguir,
-apreendidos em decorrência de medida cautelar exarada nos autos nº ${
-      dados?.operacao?.numero_autos || "-"
-    }.
-Os materiais, arrecadados pelo(a) ${dados?.posto_graduacao || ""} ${
-      dados?.comandante || "-"
-    }, CPF ${dados?.cpf_comandante || "-"}, se encontravam sob posse do(a) ${
-      dados?.alvo?.nome || "-"
-    }, CPF ${dados?.alvo?.cpf || "-"}, no endereço sito à ${
-      dados?.alvo?.endereco || "-"
-    }, bairro ${dados?.alvo?.bairro || "-"}, na cidade de ${
-      dados?.alvo?.cidade || "-"
-    }, sendo que após a apreensão foram entregues na sede do(a) ${
-      form.sede || "-"
-    }, sito à ${form.enderecoEntrega || "-"}, bairro ${
-      form.bairroEntrega || "-"
-    }, na cidade de ${
-      form.cidadeEntrega || "-"
-    }, Estado do Paraná, a(o) recebedor(a) abaixo identificado:`;
+    y = escreverParagrafoFormal(
+      doc,
+      `Aos ${dataAtual}, faço a entrega dos materiais relacionados e discriminados a seguir, apreendidos em decorrência de medida cautelar exarada nos autos nº ${textoPDF(
+        dados?.operacao?.numero_autos,
+      )}.`,
+      y,
+    );
 
-    const marginLeft = 15;
-    const marginRight = 15;
-    const indent = 10; // recuo de parágrafo
-    const maxWidth = pageWidth - marginLeft - marginRight;
-    let currentY = 60;
-    const lineHeight = 7;
+    y = escreverParagrafoFormal(
+      doc,
+      `Os materiais foram arrecadados pelo(a) ${textoPDF(
+        dados?.posto_graduacao,
+        "",
+      )} ${textoPDF(dados?.comandante)}, CPF ${textoPDF(
+        dados?.cpf_comandante,
+      )}, e encontravam-se sob posse do(a) ${textoPDF(
+        dados?.alvo?.nome,
+      )}, CPF ${textoPDF(dados?.alvo?.cpf)}, no endereço ${textoPDF(
+        dados?.alvo?.endereco,
+      )}, bairro ${textoPDF(dados?.alvo?.bairro)}, município de ${textoPDF(
+        dados?.alvo?.cidade,
+      )}.`,
+      y,
+    );
 
-    const linhas = doc.splitTextToSize(texto, maxWidth - indent);
+    y = escreverParagrafoFormal(
+      doc,
+      `Após a apreensão, os materiais foram entregues na sede do(a) ${textoPDF(
+        form.sede,
+      )}, situada à ${textoPDF(form.enderecoEntrega)}, bairro ${textoPDF(
+        form.bairroEntrega,
+      )}, município de ${textoPDF(
+        form.cidadeEntrega,
+      )}, Estado do Paraná, ao(à) recebedor(a) abaixo identificado(a).`,
+      y,
+    );
 
-    linhas.forEach((linha, idx) => {
-      const isFirstLine = idx === 0; // aplica recuo somente na primeira linha
-      const isLastLine = idx === linhas.length - 1;
-      const words = linha.split(" ");
-      const lineWidth = doc.getTextWidth(linha);
-      const spaceCount = words.length - 1;
-      const extraSpace = maxWidth - lineWidth;
-      const spacing =
-        isLastLine || spaceCount === 0 ? 0 : extraSpace / spaceCount;
-
-      let cursorX = marginLeft + (isFirstLine ? indent : 0);
-      words.forEach((word) => {
-        doc.text(word, cursorX, currentY);
-        const wordWidth = doc.getTextWidth(word);
-        cursorX += wordWidth + doc.getTextWidth(" ") + spacing;
-      });
-
-      currentY += lineHeight;
-    });
-
-    // Tabela
-    const tabelaStartY = currentY + 6;
+    y = tituloSecao(doc, "Materiais Entregues", y + 2, { alturaReserva: 24 });
 
     autoTable(doc, {
-      startY: tabelaStartY,
+      ...ESTILO_TABELA_IMPRESSAO,
+      startY: y,
       head: [
         [
-          "Item nº",
-          "Quantidade",
-          "Grupo",
-          "Descrição",
-          "Nº Série",
-          "Patrimônio",
-          "Observação",
+          "ITEM Nº",
+          "QUANTIDADE",
+          "GRUPO",
+          "DESCRIÇÃO",
+          "Nº SÉRIE",
+          "PATRIMÔNIO",
+          "OBSERVAÇÃO",
         ],
       ],
       body:
         dados?.materiais?.map((item, index) => [
           index + 1,
-          item.quantidade || "-",
-          item.item_nome || "-",
-          item.descricao || "-",
-          item.numero_serie || "-",
-          item.patrimonio || "-",
-          item.observacao || "-",
+          textoPDF(item.quantidade),
+          textoPDF(item.item_nome),
+          textoPDF(item.descricao),
+          textoPDF(item.numero_serie),
+          textoPDF(item.patrimonio),
+          textoPDF(item.observacao),
         ]) || [],
+      margin: { left: 15, right: 15, bottom: 20 },
       styles: {
-        font: "times",
-        fontSize: 9,
-        cellPadding: 3,
-        lineHeight: 1.35,
+        ...ESTILO_TABELA_IMPRESSAO.styles,
+        fontSize: 8.5,
+        cellPadding: 2.2,
       },
-      headStyles: { fillColor: [220, 220, 220] },
-      theme: "grid",
-      margin: { left: 15, right: 15 },
     });
 
-    let yFinal = doc.lastAutoTable?.finalY || tabelaStartY + 50;
+    let yFinal = doc.lastAutoTable?.finalY || y + 30;
 
     if (dados?.policiais_apoio?.length > 0) {
-      doc.setFont("times", "bold");
-      doc.setFontSize(11);
-      doc.text("Policiais de Apoio", 15, yFinal + 10);
-
-      autoTable(doc, {
-        startY: yFinal + 14,
-        head: [["Posto/Graduação", "Nome Completo", "CPF", "Unidade"]],
-        body: dados.policiais_apoio.map((policial) => [
-          policial?.posto_graduacao || "-",
-          policial?.nome || "-",
-          policial?.cpf || policial?.rg_matricula || "-",
-          policial?.unidade || "-",
-        ]),
-        styles: {
-          font: "times",
-          fontSize: 9,
-          cellPadding: 3,
-        },
-        headStyles: { fillColor: [220, 220, 220] },
-        theme: "grid",
-        margin: { left: 15, right: 15 },
+      yFinal = garantirEspaco(doc, yFinal + 10, 35);
+      yFinal = tituloSecao(doc, "Policiais de Apoio", yFinal, {
+        alturaReserva: 28,
       });
 
-      yFinal = doc.lastAutoTable?.finalY || yFinal + 35;
+      autoTable(doc, {
+        ...ESTILO_TABELA_IMPRESSAO,
+        startY: yFinal,
+        head: [["POSTO/GRADUAÇÃO", "NOME COMPLETO", "CPF", "UNIDADE"]],
+        body: dados.policiais_apoio.map((policial) => [
+          textoPDF(policial?.posto_graduacao),
+          textoPDF(policial?.nome),
+          textoPDF(policial?.cpf || policial?.rg_matricula),
+          textoPDF(policial?.unidade),
+        ]),
+        margin: { left: 15, right: 15, bottom: 20 },
+      });
+
+      yFinal = doc.lastAutoTable?.finalY || yFinal + 30;
     }
 
-    // Dados do recebedor
-    const gapAfterTable = 16;
+    yFinal = garantirEspaco(doc, yFinal + 12, 48);
+    yFinal = tituloSecao(doc, "Identificação do Recebedor", yFinal, {
+      alturaReserva: 42,
+    });
+
+    doc.setFont("times", "normal");
     doc.setFontSize(11);
+    doc.text(`NOME COMPLETO: ${textoPDF(form.nomeRecebedor)}`, 15, yFinal + 3);
     doc.text(
-      `Nome completo: ${form.nomeRecebedor || "-"}`,
+      `CPF: ${textoPDF(formatarCPF(form.cpfRecebedor) || "-")}`,
       15,
-      yFinal + gapAfterTable
-    );
-    doc.text(
-      `CPF: ${formatarCPF(form.cpfRecebedor) || "-"}`,
-      15,
-      yFinal + gapAfterTable + 10
-    );
-    doc.text(
-      "Assinatura do Recebedor(a): ___________________________",
-      15,
-      yFinal + gapAfterTable + 20
+      yFinal + 12,
     );
 
-    // Rodapé
+    doc.line(55, yFinal + 29, 155, yFinal + 29);
     doc.setFontSize(9);
-    doc.text(
-      "Documento gerado eletronicamente.",
-      pageWidth / 2,
-      pageHeight - 10,
-      {
-        align: "center",
-      }
-    );
+    doc.text("ASSINATURA DO(A) RECEBEDOR(A)", 105, yFinal + 35, {
+      align: "center",
+    });
 
-    // Remove caracteres inválidos do nome do arquivo
-const sanitizarNomeArquivo = (texto) => {
-  return String(texto || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // remove acentos
-    .replace(/[^\w\s-]/g, "")        // remove caracteres especiais
-    .trim()
-    .replace(/\s+/g, "_")            // espaços -> _
-    .toUpperCase();
-};
+    adicionarRodapePaginas(doc);
 
-const nomeOperacao = sanitizarNomeArquivo(
-  dados?.operacao?.nome_operacao
-);
-const numeroAlvo = dados?.alvo?.numero_alvo || "0";
+    const sanitizarNomeArquivo = (texto) => {
+      return String(texto || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^\w\s-]/g, "")
+        .trim()
+        .replace(/\s+/g, "_")
+        .toUpperCase();
+    };
 
-doc.save(`termo_cautela_${nomeOperacao}_alvo_${numeroAlvo}.pdf`);
+    const nomeOperacao = sanitizarNomeArquivo(dados?.operacao?.nome_operacao);
+    const numeroAlvo = dados?.alvo?.numero_alvo || "0";
+
+    doc.save(`termo_cautela_${nomeOperacao}_alvo_${numeroAlvo}.pdf`);
   };
 
   if (carregando) {

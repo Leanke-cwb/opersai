@@ -3,6 +3,22 @@ import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+  ESTILO_TABELA_IMPRESSAO,
+  adicionarRodapePaginas,
+  escreverParagrafoFormal,
+  garantirEspaco,
+  tituloSecao,
+} from "../utils/pdfFormal";
+
+function textoPDF(valor, padrao = "-") {
+  const texto =
+    valor === null || valor === undefined || String(valor).trim() === ""
+      ? padrao
+      : String(valor).trim();
+
+  return texto.toLocaleUpperCase("pt-BR");
+}
 
 function formatarData(data) {
   if (!data) return "-";
@@ -196,19 +212,17 @@ export default function DetalhesApoioExterno() {
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
 
     const logoPMPR =
       "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png";
     const logoCOGER =
       "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/brasao.png";
 
-    const dataEntrega = formatarDataPorExtenso(
-      apoio.entrega_data || apoio.data
+    const dataEntrega = textoPDF(
+      formatarDataPorExtenso(apoio.entrega_data || apoio.data),
     );
     const horaEntrega = formatarHora(apoio.entrega_hora);
 
-    // Cabeçalho - mesmo padrão do PDF da Cautela
     doc.addImage(logoPMPR, "PNG", pageWidth - 40, 10, 25, 25);
     doc.addImage(logoCOGER, "PNG", 15, 10, 25, 25);
 
@@ -220,175 +234,132 @@ export default function DetalhesApoioExterno() {
     doc.text("CORREGEDORIA-GERAL", pageWidth / 2, 27, {
       align: "center",
     });
-
+    doc.setLineWidth(0.25);
     doc.line(15, 40, pageWidth - 15, 40);
 
-    // Título - mesmo padrão do PDF da Cautela
     doc.setFontSize(12);
     doc.text("TERMO DE ENTREGA DE MATERIAL", pageWidth / 2, 50, {
       align: "center",
     });
 
-    doc.setFont("times", "normal");
-    doc.setFontSize(12);
-
-    const referenciaOperacao = apoio.nome_operacao
-      ? `, no contexto da operação ${apoio.nome_operacao}`
-      : "";
-
-    const referenciaProcedimento = apoio.numero_procedimento
-      ? `, referente ao procedimento nº ${apoio.numero_procedimento}`
-      : "";
-
     const referenciaUnidade = apoio.unidade
-      ? `, unidade ${apoio.unidade}`
+      ? `, unidade ${textoPDF(apoio.unidade)}`
       : "";
-
+    const referenciaOperacao = apoio.nome_operacao
+      ? `, no contexto da operação ${textoPDF(apoio.nome_operacao)}`
+      : "";
+    const referenciaProcedimento = apoio.numero_procedimento
+      ? `, referente ao procedimento nº ${textoPDF(apoio.numero_procedimento)}`
+      : "";
     const referenciaLocal = [apoio.local, apoio.cidade]
       .filter(Boolean)
-      .join(", na cidade de ");
-
+      .map((valor) => textoPDF(valor))
+      .join(", município de ");
     const referenciaEntregaUnidade = apoio.entrega_unidade
-      ? `, unidade ${apoio.entrega_unidade}`
+      ? `, unidade ${textoPDF(apoio.entrega_unidade)}`
       : "";
 
-    const texto = `Aos ${dataEntrega}${
-      horaEntrega !== "-" ? `, às ${horaEntrega}` : ""
-    }, faço a entrega dos materiais relacionados e discriminados a seguir, apreendidos durante apoio prestado ao(à) ${
-      apoio.orgao || "-"
-    }${referenciaUnidade}${referenciaOperacao}${referenciaProcedimento}. Os materiais foram arrecadados pela equipe da Polícia Militar do Paraná, sob comando do(a) ${
-      apoio.comandante_posto_graduacao || ""
-    } ${apoio.comandante_nome || "-"}, CPF ${
-      apoio.comandante_cpf || "-"
-    }${
-      referenciaLocal ? `, durante atuação realizada em ${referenciaLocal}` : ""
-    }, sendo que após a apreensão foram entregues ao(à) ${
-      apoio.entrega_orgao || apoio.orgao || "-"
-    }${referenciaEntregaUnidade}, ao(à) recebedor(a) abaixo identificado(a):`;
+    let y = 62;
 
-    const marginLeft = 15;
-    const marginRight = 15;
-    const indent = 10;
-    const maxWidth = pageWidth - marginLeft - marginRight;
-    let currentY = 60;
-    const lineHeight = 7;
+    y = escreverParagrafoFormal(
+      doc,
+      `Aos ${dataEntrega}${
+        horaEntrega !== "-" ? `, às ${horaEntrega}` : ""
+      }, faço a entrega dos materiais relacionados e discriminados a seguir, apreendidos durante apoio prestado ao(à) ${textoPDF(
+        apoio.orgao,
+      )}${referenciaUnidade}${referenciaOperacao}${referenciaProcedimento}.`,
+      y,
+    );
 
-    const linhas = doc.splitTextToSize(texto, maxWidth - indent);
+    y = escreverParagrafoFormal(
+      doc,
+      `Os materiais foram arrecadados pela equipe da Polícia Militar do Paraná, sob comando do(a) ${textoPDF(
+        apoio.comandante_posto_graduacao,
+        "",
+      )} ${textoPDF(apoio.comandante_nome)}, CPF ${textoPDF(
+        apoio.comandante_cpf,
+      )}${
+        referenciaLocal ? `, durante atuação realizada em ${referenciaLocal}` : ""
+      }.`,
+      y,
+    );
 
-    linhas.forEach((linha, idx) => {
-      const isFirstLine = idx === 0;
-      const isLastLine = idx === linhas.length - 1;
-      const words = linha.split(" ");
-      const lineWidth = doc.getTextWidth(linha);
-      const spaceCount = words.length - 1;
-      const extraSpace = maxWidth - lineWidth;
-      const spacing =
-        isLastLine || spaceCount === 0 ? 0 : extraSpace / spaceCount;
+    y = escreverParagrafoFormal(
+      doc,
+      `Após a apreensão, os materiais foram entregues ao(à) ${textoPDF(
+        apoio.entrega_orgao || apoio.orgao,
+      )}${referenciaEntregaUnidade}, ao(à) responsável abaixo identificado(a).`,
+      y,
+    );
 
-      let cursorX = marginLeft + (isFirstLine ? indent : 0);
-
-      words.forEach((word) => {
-        doc.text(word, cursorX, currentY);
-        const wordWidth = doc.getTextWidth(word);
-        cursorX += wordWidth + doc.getTextWidth(" ") + spacing;
-      });
-
-      currentY += lineHeight;
-    });
-
-    const tabelaStartY = currentY + 6;
+    y = tituloSecao(doc, "Materiais Entregues", y + 2, { alturaReserva: 24 });
 
     autoTable(doc, {
-      startY: tabelaStartY,
+      ...ESTILO_TABELA_IMPRESSAO,
+      startY: y,
       head: [
         [
-          "Item nº",
-          "Quantidade",
-          "Grupo",
-          "Descrição",
-          "Nº Série",
-          "Patrimônio",
-          "Observação",
+          "ITEM Nº",
+          "QUANTIDADE",
+          "GRUPO",
+          "DESCRIÇÃO",
+          "Nº SÉRIE",
+          "PATRIMÔNIO",
+          "OBSERVAÇÃO",
         ],
       ],
       body: itens.map((item, index) => [
         item.numero_item ?? index + 1,
-        item.quantidade || "-",
-        item.item_nome || item.tipo_categoria || "-",
-        item.descricao || "-",
-        item.numero_serie || "-",
-        item.patrimonio || "-",
-        item.observacao || "-",
+        textoPDF(item.quantidade),
+        textoPDF(item.item_nome || item.tipo_categoria),
+        textoPDF(item.descricao),
+        textoPDF(item.numero_serie),
+        textoPDF(item.patrimonio),
+        textoPDF(item.observacao),
       ]),
+      margin: { left: 15, right: 15, bottom: 20 },
       styles: {
-        font: "times",
-        fontSize: 9,
-        cellPadding: 3,
-        lineHeight: 1.35,
+        ...ESTILO_TABELA_IMPRESSAO.styles,
+        fontSize: 8.5,
+        cellPadding: 2.2,
       },
-      headStyles: { fillColor: [220, 220, 220] },
-      theme: "grid",
-      margin: { left: 15, right: 15 },
     });
 
-    let yFinal = doc.lastAutoTable?.finalY || tabelaStartY + 50;
+    let yFinal = doc.lastAutoTable?.finalY || y + 30;
+    yFinal = garantirEspaco(doc, yFinal + 12, apoio.observacoes_entrega ? 66 : 52);
+    yFinal = tituloSecao(doc, "Identificação do Recebedor", yFinal, {
+      alturaReserva: 45,
+    });
 
-    // Se a tabela terminar muito perto do rodapé, abre uma nova página
-    // para manter os dados do recebedor legíveis.
-    if (yFinal + 62 > pageHeight - 15) {
-      doc.addPage();
-      yFinal = 25;
-    }
-
-    const gapAfterTable = 16;
+    doc.setFont("times", "normal");
     doc.setFontSize(11);
+    doc.text(`NOME COMPLETO: ${textoPDF(apoio.responsavel_nome)}`, 15, yFinal + 3);
+    doc.text(`FUNÇÃO/CARGO: ${textoPDF(apoio.responsavel_funcao)}`, 15, yFinal + 12);
     doc.text(
-      `Nome completo: ${apoio.responsavel_nome || "-"}`,
+      `DOCUMENTO/MATRÍCULA: ${textoPDF(apoio.responsavel_documento)}`,
       15,
-      yFinal + gapAfterTable
+      yFinal + 21,
     );
-    doc.text(
-      `Função/Cargo: ${apoio.responsavel_funcao || "-"}`,
-      15,
-      yFinal + gapAfterTable + 10
-    );
-    doc.text(
-      `Documento/Matrícula: ${apoio.responsavel_documento || "-"}`,
-      15,
-      yFinal + gapAfterTable + 20
-    );
+
+    let yAssinatura = yFinal + 31;
 
     if (apoio.observacoes_entrega) {
       const linhasObs = doc.splitTextToSize(
-        `Observações: ${apoio.observacoes_entrega}`,
-        pageWidth - 30
+        `OBSERVAÇÕES: ${textoPDF(apoio.observacoes_entrega)}`,
+        pageWidth - 30,
       );
-      doc.text(linhasObs, 15, yFinal + gapAfterTable + 30);
-      doc.text(
-        "Assinatura do Recebedor(a): ___________________________",
-        15,
-        yFinal + gapAfterTable + 30 + linhasObs.length * 6 + 8
-      );
-    } else {
-      doc.text(
-        "Assinatura do Recebedor(a): ___________________________",
-        15,
-        yFinal + gapAfterTable + 30
-      );
+      doc.text(linhasObs, 15, yAssinatura);
+      yAssinatura += linhasObs.length * 5.5 + 8;
     }
 
-    // Rodapé em todas as páginas
-    const totalPaginas = doc.getNumberOfPages();
-    for (let pagina = 1; pagina <= totalPaginas; pagina += 1) {
-      doc.setPage(pagina);
-      doc.setFontSize(9);
-      doc.text(
-        "Documento gerado eletronicamente.",
-        pageWidth / 2,
-        pageHeight - 10,
-        { align: "center" }
-      );
-    }
+    yAssinatura = garantirEspaco(doc, yAssinatura, 24);
+    doc.line(55, yAssinatura + 10, 155, yAssinatura + 10);
+    doc.setFontSize(9);
+    doc.text("ASSINATURA DO(A) RECEBEDOR(A)", 105, yAssinatura + 16, {
+      align: "center",
+    });
+
+    adicionarRodapePaginas(doc);
 
     const orgaoArquivo = sanitizarNomeArquivo(apoio.orgao || "APOIO");
     const dataArquivo = String(apoio.data || apoio.entrega_data || "")
@@ -396,7 +367,7 @@ export default function DetalhesApoioExterno() {
       .trim();
 
     doc.save(
-      `termo_apoio_${orgaoArquivo}${dataArquivo ? `_${dataArquivo}` : ""}.pdf`
+      `termo_apoio_${orgaoArquivo}${dataArquivo ? `_${dataArquivo}` : ""}.pdf`,
     );
   }
 

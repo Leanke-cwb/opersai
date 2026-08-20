@@ -4,6 +4,21 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabase/client";
 import jsPDF from "jspdf";
+import {
+  adicionarRodapePaginas,
+  escreverCampoQuebravel,
+  garantirEspaco,
+  tituloSecao,
+} from "../utils/pdfFormal";
+
+function textoPDF(valor, padrao = "-") {
+  const texto =
+    valor === null || valor === undefined || String(valor).trim() === ""
+      ? padrao
+      : String(valor).trim();
+
+  return texto.toLocaleUpperCase("pt-BR");
+}
 
 export default function GerarCadeiaCustodia() {
   const navigate = useNavigate();
@@ -13,16 +28,66 @@ export default function GerarCadeiaCustodia() {
     gerarPDF();
   }, []);
 
+  function desenharCabecalho(doc) {
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    const logoPMPR =
+      "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png";
+    const logoCOGER =
+      "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/brasao.png";
+
+    doc.addImage(logoCOGER, "PNG", 15, 10, 25, 25);
+    doc.addImage(logoPMPR, "PNG", pageWidth - 40, 10, 25, 25);
+
+    doc.setFont("times", "bold");
+    doc.setFontSize(13);
+    doc.text("POLÍCIA MILITAR DO PARANÁ", pageWidth / 2, 18, {
+      align: "center",
+    });
+    doc.text("CORREGEDORIA-GERAL", pageWidth / 2, 25, {
+      align: "center",
+    });
+    doc.text("SEÇÃO DE ASSUNTOS INTERNOS", pageWidth / 2, 32, {
+      align: "center",
+    });
+
+    doc.setLineWidth(0.25);
+    doc.line(15, 40, pageWidth - 15, 40);
+
+    doc.setFontSize(12);
+    doc.text("FORMULÁRIO DE CADEIA DE CUSTÓDIA", pageWidth / 2, 50, {
+      align: "center",
+    });
+  }
+
+  function desenharAssinatura(doc, titulo, nome, cpf, yInicial) {
+    let y = garantirEspaco(doc, yInicial, 35, 20, 18);
+
+    doc.setFont("times", "bold");
+    doc.setFontSize(10);
+    doc.text(titulo, 15, y);
+    y += 7;
+
+    doc.setFont("times", "normal");
+    doc.text(textoPDF(nome, "—"), 15, y);
+    y += 6;
+    doc.text(`CPF: ${textoPDF(cpf, "—")}`, 15, y);
+    y += 11;
+
+    doc.line(15, y, 95, y);
+    doc.setFontSize(8);
+    doc.text("ASSINATURA", 55, y + 5, { align: "center" });
+
+    return y + 12;
+  }
+
   async function gerarPDF() {
     try {
       const alvoId = localStorage.getItem("alvoId");
-console.log("ID DO ALVO RECEBIDO:", alvoId);
-
       const selecionados = JSON.parse(
-        localStorage.getItem("custodiaSelecionados") || "{}"
+        localStorage.getItem("custodiaSelecionados") || "{}",
       );
 
-      // ALVO
       const { data: alvo } = await supabase
         .from("alvos")
         .select("*")
@@ -34,29 +99,23 @@ console.log("ID DO ALVO RECEBIDO:", alvoId);
         return;
       }
 
-      // OPERAÇÃO
       const { data: operacao } = await supabase
         .from("operacoes")
         .select("*")
         .eq("id", alvo.operacao_id)
         .single();
 
-      // AUTO
-      const { data: auto, error: erroAuto } = await supabase
-  .from("auto_circunstanciado")
-  .select("*")
-  .eq("alvo_id", alvoId)
-  .maybeSingle();
-
-console.log("AUTO NO PDF:", auto);
-console.log("ERRO AUTO PDF:", erroAuto);
+      const { data: auto } = await supabase
+        .from("auto_circunstanciado")
+        .select("*")
+        .eq("alvo_id", alvoId)
+        .maybeSingle();
 
       if (!auto) {
         alert("Auto Circunstanciado não encontrado.");
         return;
       }
 
-      // ITENS
       const { data: itens } = await supabase
         .from("auto_itens")
         .select("*")
@@ -68,350 +127,141 @@ console.log("ERRO AUTO PDF:", erroAuto);
         return;
       }
 
-      // CUMPRIMENTO
       const { data: cumprimento } = await supabase
         .from("cumprimento_mandado")
         .select("*")
         .eq("alvo_id", alvoId)
         .single();
 
-      // USUÁRIOS
-      const { data: usuarios } = await supabase
-        .from("usuarios")
-        .select("*");
+      const { data: usuarios } = await supabase.from("usuarios").select("*");
 
       const doc = new jsPDF("p", "mm", "a4");
 
-      for (let i = 0; i < itens.length; i++) {
+      for (let i = 0; i < itens.length; i += 1) {
         const item = itens[i];
 
         if (i > 0) {
           doc.addPage();
         }
 
-        const custodiante = usuarios?.find(
-          (u) => u.id === selecionados[item.id]
+        desenharCabecalho(doc);
+
+        const custodiante = usuarios?.find((u) => u.id === selecionados[item.id]);
+        let y = 63;
+
+        y = tituloSecao(doc, "1. Procedimento Vinculado", y, {
+          alturaReserva: 48,
+        });
+        y = escreverCampoQuebravel(
+          doc,
+          "Nº PROCEDIMENTO",
+          textoPDF(operacao?.numero_autos),
+          y,
+        );
+        y = escreverCampoQuebravel(
+          doc,
+          "OPERAÇÃO",
+          textoPDF(operacao?.nome_operacao),
+          y,
+        );
+        y = escreverCampoQuebravel(doc, "ALVO", textoPDF(alvo.nome), y);
+        y = escreverCampoQuebravel(doc, "CPF", textoPDF(alvo.cpf), y);
+        y = escreverCampoQuebravel(
+          doc,
+          "ENDEREÇO",
+          textoPDF(alvo.endereco),
+          y,
+        );
+        y = escreverCampoQuebravel(doc, "CIDADE", textoPDF(alvo.cidade), y);
+        y = escreverCampoQuebravel(
+          doc,
+          "DATA DA COLETA",
+          textoPDF(cumprimento?.data),
+          y,
+        );
+        y = escreverCampoQuebravel(
+          doc,
+          "HORA DA COLETA",
+          textoPDF(cumprimento?.hora),
+          y,
         );
 
-       // ========================================
-// CABEÇALHO PADRÃO COGER
-// ========================================
-
-const pageWidth = doc.internal.pageSize.getWidth();
-
-const logoPMPR =
-  "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png";
-
-const logoCOGER =
-  "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/brasao.png";
-
-// Logos
-doc.addImage(logoCOGER, "PNG", 15, 10, 25, 25);
-doc.addImage(logoPMPR, "PNG", pageWidth - 40, 10, 25, 25);
-
-// Texto institucional
-doc.setFont("times", "bold");
-doc.setFontSize(13);
-
-doc.text(
-  "POLÍCIA MILITAR DO PARANÁ",
-  pageWidth / 2,
-  18,
-  { align: "center" }
-);
-
-doc.text(
-  "CORREGEDORIA-GERAL",
-  pageWidth / 2,
-  25,
-  { align: "center" }
-);
-
-doc.text(
-  "SEÇÃO DE ASSUNTOS INTERNOS",
-  pageWidth / 2,
-  32,
-  { align: "center" }
-);
-
-// Linha divisória
-doc.line(15, 40, pageWidth - 15, 40);
-
-// Título do documento
-doc.setFontSize(12);
-
-doc.text(
-  "FORMULÁRIO DE CADEIA DE CUSTÓDIA",
-  pageWidth / 2,
-  50,
-  { align: "center" }
-);
-
-// Moldura
-doc.rect(10, 55, 190, 220);
-
-doc.setFont("times", "normal");
-
-let y = 65;
-
-        // PROCEDIMENTO
-        doc.setFontSize(12);
-        doc.setFont(undefined, "bold");
-        doc.text("1. PROCEDIMENTO VINCULADO", 14, y);
-
-        y += 8;
-
-        doc.setFont(undefined, "normal");
-        doc.setFontSize(10);
-
-        doc.text(
-          `Nº Procedimento: ${operacao?.numero_autos || "-"}`,
-          14,
-          y
+        y = tituloSecao(doc, "2. Identificação do Vestígio", y + 4, {
+          alturaReserva: 42,
+        });
+        y = escreverCampoQuebravel(doc, "ITEM", textoPDF(item.numero_item), y);
+        y = escreverCampoQuebravel(doc, "TIPO", textoPDF(item.tipo_item), y);
+        y = escreverCampoQuebravel(doc, "LACRE", textoPDF(item.lacre), y);
+        y = escreverCampoQuebravel(
+          doc,
+          "DESCRIÇÃO",
+          textoPDF(item.descricao),
+          y,
+          { largura: 180 },
         );
-        y += 6;
-
-        doc.text(
-          `Operação: ${operacao?.nome_operacao || "-"}`,
-          14,
-          y
-        );
-        y += 6;
-
-        doc.text(`Alvo: ${alvo.nome || "-"}`, 14, y);
-        y += 6;
-
-        doc.text(`CPF: ${alvo.cpf || "-"}`, 14, y);
-        y += 6;
-
-        doc.text(`Endereço: ${alvo.endereco || "-"}`, 14, y);
-        y += 6;
-
-        doc.text(`Cidade: ${alvo.cidade || "-"}`, 14, y);
-        y += 6;            doc.text(
-          `Data da Coleta: ${cumprimento?.data || "-"}`,
-          14,
-          y
-        );
-        y += 6;
-
-        doc.text(
-          `Hora da Coleta: ${cumprimento?.hora || "-"}`,
-          14,
-          y
+        y = escreverCampoQuebravel(
+          doc,
+          "LOCALIZAÇÃO",
+          textoPDF(item.local_encontrado),
+          y,
+          { largura: 180 },
         );
 
-        y += 12;
-
-        // VESTÍGIO
-        doc.setFont(undefined, "bold");
-        doc.text("2. IDENTIFICAÇÃO DO VESTÍGIO", 14, y);
-
-        y += 8;
-
-        doc.setFont(undefined, "normal");
-
-        doc.text(
-          `Item: ${item.numero_item || "-"}`,
-          14,
-          y
+        y = tituloSecao(doc, "3. Responsável pela Arrecadação", y + 4, {
+          alturaReserva: 30,
+        });
+        y = escreverCampoQuebravel(
+          doc,
+          "POSTO/GRADUAÇÃO",
+          textoPDF(cumprimento?.comandante_posto_graduacao),
+          y,
         );
-        y += 6;
-
-        doc.text(
-          `Tipo: ${item.tipo_item || "-"}`,
-          14,
-          y
+        y = escreverCampoQuebravel(
+          doc,
+          "NOME",
+          textoPDF(cumprimento?.comandante_nome),
+          y,
         );
-        y += 6;
-
-        doc.text(
-          `Lacre: ${item.lacre || "-"}`,
-          14,
-          y
-        );
-        y += 6;
-
-        doc.text("Descrição:", 14, y);
-
-        y += 6;
-
-        const descricao = doc.splitTextToSize(
-          item.descricao || "-",
-          170
+        y = escreverCampoQuebravel(
+          doc,
+          "CPF",
+          textoPDF(cumprimento?.comandante_cpf),
+          y,
         );
 
-        doc.text(descricao, 14, y);
+        y = tituloSecao(doc, "4. Cadeia de Custódia", y + 4, {
+          alturaReserva: 70,
+        });
 
-        y += descricao.length * 5 + 4;
-
-        doc.text(
-          `Localização: ${
-            item.local_encontrado || "-"
-          }`,
-          14,
-          y
+        y = desenharAssinatura(
+          doc,
+          "1º CUSTODIANTE",
+          `${textoPDF(cumprimento?.comandante_posto_graduacao, "")} ${textoPDF(
+            cumprimento?.comandante_nome,
+            "",
+          )}`.trim(),
+          cumprimento?.comandante_cpf,
+          y,
         );
 
-        y += 12;
-
-        // RESPONSÁVEL PELA ARRECADAÇÃO
-        doc.setFont(undefined, "bold");
-        doc.text(
-          "3. RESPONSÁVEL PELA ARRECADAÇÃO",
-          14,
-          y
-        );
-
-        y += 8;
-
-        doc.setFont(undefined, "normal");
-
-        doc.text(
-          `Posto/Graduação: ${
-            cumprimento?.comandante_posto_graduacao || "-"
-          }`,
-          14,
-          y
-        );
-
-        y += 6;
-
-        doc.text(
-          `Nome: ${
-            cumprimento?.comandante_nome || "-"
-          }`,
-          14,
-          y
-        );
-
-        y += 6;
-
-        doc.text(
-          `CPF: ${
-            cumprimento?.comandante_cpf || "-"
-          }`,
-          14,
-          y
-        );
-
-        y += 12;
-
-       // CADEIA DE CUSTÓDIA
-doc.setFont(undefined, "bold");
-doc.text("4. CADEIA DE CUSTÓDIA", 14, y);
-
-y += 8;
-
-doc.setFont(undefined, "normal");
-// 1º CUSTODIANTE
-doc.text("1º CUSTODIANTE", 14, y);
-
-y += 6;
-
-doc.text(
-  `${cumprimento?.comandante_posto_graduacao || ""} ${
-    cumprimento?.comandante_nome || ""
-  }`,
-  14,
-  y
-);
-
-y += 6;
-
-doc.text(
-  `CPF: ${cumprimento?.comandante_cpf || ""}`,
-  14,
-  y
-);
-
-y += 8;
-
-// Linha da assinatura abaixo
-doc.line(14, y, 90, y);
-
-y += 5;
-
-doc.setFontSize(8);
-
-doc.text(
-  "Assinatura",
-  52,
-  y,
-  { align: "center" }
-);
-
-y += 8;
-
-// ========================================
-// 2º CUSTODIANTE
-// ========================================
-
-doc.setFontSize(10);
-
-doc.text(
-  "2º CUSTODIANTE",
-  14,
-  y
-);
-
-y += 6;
-
-doc.text(
-  `${custodiante?.posto_graduacao || ""} ${
-    custodiante?.nome || ""
-  }`,
-  14,
-  y
-);
-
-y += 6;
-
-doc.text(
-  `CPF: ${custodiante?.cpf || ""}`,
-  14,
-  y
-);
-
-y += 6;
-
-// Linha da assinatura abaixo
-doc.line(14, y, 90, y);
-
-y += 3;
-
-doc.setFontSize(8);
-
-doc.text(
-  "Assinatura",
-  52,
-  y,
-  { align: "center" }
-);
-
-y += 6;
-  
-        // RODAPÉ
-        doc.setFontSize(8);
-
-        doc.text(
-          `Item ${item.numero_item}`,
-          14,
-          290
-        );
-
-        doc.text(
-          `Página ${i + 1} de ${itens.length}`,
-          196,
-          290,
-          { align: "right" }
+        desenharAssinatura(
+          doc,
+          "2º CUSTODIANTE",
+          `${textoPDF(custodiante?.posto_graduacao, "")} ${textoPDF(
+            custodiante?.nome,
+            "",
+          )}`.trim(),
+          custodiante?.cpf,
+          y,
         );
       }
 
+      adicionarRodapePaginas(doc, "FORMULÁRIO DE CADEIA DE CUSTÓDIA");
+
       doc.save(
-        `Cadeia_Custodia_${alvo.nome
+        `Cadeia_Custodia_${String(alvo.nome || "ALVO")
           .replace(/\s+/g, "_")
-          .toUpperCase()}.pdf`
+          .toUpperCase()}.pdf`,
       );
     } catch (erro) {
       console.error(erro);
@@ -424,9 +274,7 @@ y += 6;
   return (
     <div className="p-6">
       <h2 className="text-xl font-bold">
-        {loading
-          ? "Gerando PDF..."
-          : "PDF gerado com sucesso"}
+        {loading ? "Gerando PDF..." : "PDF gerado com sucesso"}
       </h2>
 
       <button

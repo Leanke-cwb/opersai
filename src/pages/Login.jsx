@@ -9,108 +9,104 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState("");
+  const [entrando, setEntrando] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setErro("");
+    setEntrando(true);
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password: senha,
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password: senha,
+      });
 
-    if (error) {
-      setErro("Email ou senha incorretos.");
-      return;
-    }
-
-    if (!data.user?.email_confirmed_at) {
-      setErro("Por favor, confirme seu e-mail antes de fazer login.");
-      return;
-    }
-
-    // Verifica se já existe cadastro complementar
-    const { data: existing, error: selectError } = await supabase
-      .from("usuarios")
-      .select("*")
-      .eq("user_id", data.user.id)
-      .maybeSingle();
-
-    if (selectError) {
-      console.error(selectError);
-      setErro("Erro ao verificar cadastro do usuário.");
-      return;
-    }
-
-    // Primeiro acesso após confirmação do email
-    if (!existing) {
-      const metadata = data.user.user_metadata || {};
-
-      const { error: insertError } = await supabase
-        .from("usuarios")
-        .insert([
-          {
-            user_id: data.user.id,
-            posto_graduacao: metadata.posto_graduacao || "",
-            nome: metadata.nome || "",
-            cpf: metadata.cpf || "",
-            telefone: metadata.telefone || "",
-            nucleo_id: metadata.nucleo_id || null,
-            email: data.user.email,
-
-            perfil: "usuario",
-            ativo: false,
-          },
-        ]);
-
-      if (insertError) {
-        console.error(insertError);
-
-        setErro(
-          "Erro ao concluir cadastro. Entre em contato com o administrador."
-        );
-
-        await supabase.auth.signOut();
+      if (error) {
+        setErro("Email ou senha incorretos.");
         return;
       }
 
-      await supabase.auth.signOut();
+      if (!data.user?.email_confirmed_at) {
+        setErro("Por favor, confirme seu e-mail antes de fazer login.");
+        return;
+      }
 
-      setErro(
-        "Cadastro criado com sucesso. Aguarde aprovação do administrador."
-      );
+      // Verifica se já existe cadastro complementar.
+      const { data: existing, error: selectError } = await supabase
+        .from("usuarios")
+        .select("*")
+        .eq("user_id", data.user.id)
+        .maybeSingle();
 
-      return;
+      if (selectError) {
+        console.error(selectError);
+        setErro("Erro ao verificar cadastro do usuário.");
+        return;
+      }
+
+      // Primeiro acesso após confirmação do e-mail.
+      if (!existing) {
+        const metadata = data.user.user_metadata || {};
+
+        const { error: insertError } = await supabase
+          .from("usuarios")
+          .insert([
+            {
+              user_id: data.user.id,
+              posto_graduacao: metadata.posto_graduacao || "",
+              nome: metadata.nome || "",
+              cpf: metadata.cpf || "",
+              telefone: metadata.telefone || "",
+              nucleo_id: metadata.nucleo_id || null,
+              email: data.user.email,
+              perfil: "usuario",
+              ativo: false,
+            },
+          ]);
+
+        if (insertError) {
+          console.error(insertError);
+          setErro(
+            "Erro ao concluir cadastro. Entre em contato com o administrador."
+          );
+          await supabase.auth.signOut();
+          return;
+        }
+
+        await supabase.auth.signOut();
+        setErro(
+          "Cadastro criado com sucesso. Aguarde aprovação do administrador."
+        );
+        return;
+      }
+
+      // Usuário ainda não aprovado.
+      if (!existing.ativo) {
+        await supabase.auth.signOut();
+        setErro(
+          "Seu cadastro ainda não foi aprovado pelo administrador do sistema."
+        );
+        return;
+      }
+
+      /*
+       * IMPORTANTE:
+       * todos os usuários aprovados entram SEMPRE no Painel Principal.
+       * O perfil não redireciona mais admin/chefe para páginas de usuários.
+       * O acesso à edição de usuários acontece somente pelo botão da Home.
+       */
+      navigate("/home", { replace: true });
+    } catch (err) {
+      console.error("Erro no login:", err);
+      setErro("Não foi possível concluir o login.");
+    } finally {
+      setEntrando(false);
     }
+  };
 
-    // Usuário ainda não aprovado
-if (!existing.ativo) {
-  await supabase.auth.signOut();
-
-  setErro(
-    "Seu cadastro ainda não foi aprovado pelo administrador do sistema."
-  );
-
-  return;
-}
-
-// Administrador
-if (existing.perfil === "admin") {
-  navigate("/admin");
-  return;
-}
-
-// Chefe de Núcleo
-if (existing.perfil === "chefe_nucleo") {
-  navigate("/chefe-nucleo");
-  return;
-}
-
-// Usuário comum
-navigate("/home");
-};
-return (
+  return (
     <div
       className="min-h-screen flex items-center justify-center"
       style={{
@@ -124,15 +120,9 @@ return (
         onSubmit={handleLogin}
         className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm bg-opacity-55"
       >
-        <h2 className="text-2xl font-bold mb-6 text-center">
-          Login
-        </h2>
+        <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
 
-        {erro && (
-          <p className="text-red-500 text-sm mb-4">
-            {erro}
-          </p>
-        )}
+        {erro && <p className="text-red-500 text-sm mb-4">{erro}</p>}
 
         <input
           type="email"
@@ -144,6 +134,7 @@ return (
           }}
           className="w-full p-2 border rounded mb-4"
           required
+          disabled={entrando}
         />
 
         <input
@@ -156,26 +147,27 @@ return (
           }}
           className="w-full p-2 border rounded mb-4"
           required
+          disabled={entrando}
         />
 
         <button
           type="submit"
-          className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+          className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 disabled:opacity-60"
+          disabled={entrando}
         >
-          Entrar
+          {entrando ? "Entrando..." : "Entrar"}
         </button>
 
         <div className="text-center mt-4">
-          <span className="text-gray-600">
-            Não tem conta?
-          </span>{" "}
+          <span className="text-gray-600">Não tem conta?</span>{" "}
           <button
-  type="button"
-  onClick={() => navigate("/register")}
-  className="text-blue-600 hover:underline"
->
-  Cadastre-se
-</button>
+            type="button"
+            onClick={() => navigate("/register")}
+            className="text-blue-600 hover:underline"
+            disabled={entrando}
+          >
+            Cadastre-se
+          </button>
         </div>
       </form>
     </div>

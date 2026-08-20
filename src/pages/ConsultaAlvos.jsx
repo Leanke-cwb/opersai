@@ -173,9 +173,32 @@ export default function ConsultaAlvos() {
 
     const pdf = new jsPDF("p", "mm", "a4");
     const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgHeight = (canvas.height * pdfWidth) / canvas.width;
 
-    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+    let alturaRestante = imgHeight;
+    let posicao = 0;
+
+    pdf.addImage(imgData, "PNG", 0, posicao, pdfWidth, imgHeight);
+    alturaRestante -= pageHeight;
+
+    while (alturaRestante > 0) {
+      posicao = alturaRestante - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, "PNG", 0, posicao, pdfWidth, imgHeight);
+      alturaRestante -= pageHeight;
+    }
+
+    const totalPaginas = pdf.internal.getNumberOfPages();
+    for (let pagina = 1; pagina <= totalPaginas; pagina += 1) {
+      pdf.setPage(pagina);
+      pdf.setFont("times", "normal");
+      pdf.setFontSize(8);
+      pdf.text(`PÁGINA ${pagina} DE ${totalPaginas}`, pdfWidth - 12, pageHeight - 7, {
+        align: "right",
+      });
+    }
+
     pdf.save("relatorio_alvos.pdf");
   }
 
@@ -245,6 +268,8 @@ export default function ConsultaAlvos() {
                   padding: "20mm",
                   backgroundColor: "white",
                   boxSizing: "border-box",
+                  fontFamily: "Times New Roman, Times, serif",
+                  textTransform: "uppercase",
                 }}
               >
                 {/* Cabeçalho */}
@@ -303,9 +328,9 @@ export default function ConsultaAlvos() {
                         pageBreakInside: "avoid",
                         marginBottom: "40px",
                         padding: "15px",
-                        border: "1px solid #ddd",
-                        borderRadius: "8px",
-                        boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+                        border: "1px solid #000",
+                        borderRadius: "0",
+                        boxShadow: "none",
                         width: "100%",
                       }}
                     >
@@ -332,7 +357,7 @@ export default function ConsultaAlvos() {
                               maxWidth: "150px",
                               height: "auto",
                               borderRadius: "6px",
-                              border: "1px solid #ccc",
+                              border: "1px solid #000",
                               marginBottom: "8px",
                               objectFit: "contain",
                               display: "inline-block", // garante centralização
@@ -373,8 +398,8 @@ export default function ConsultaAlvos() {
                         <div
                           style={{
                             flex: "1 1 70%",
-                            border: "1px solid #ccc",
-                            borderRadius: "6px",
+                            border: "1px solid #000",
+                            borderRadius: "0",
                             padding: "8px",
                             boxSizing: "border-box",
                           }}

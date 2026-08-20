@@ -4,6 +4,20 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+  ESTILO_TABELA_IMPRESSAO,
+  adicionarRodapePaginas,
+  tituloSecao,
+} from "../utils/pdfFormal";
+
+function textoPDF(valor, padrao = "-") {
+  const texto =
+    valor === null || valor === undefined || String(valor).trim() === ""
+      ? padrao
+      : String(valor).trim();
+
+  return texto.toLocaleUpperCase("pt-BR");
+}
 
 export default function GerarFormularioCelular() {
   const navigate = useNavigate();
@@ -42,136 +56,109 @@ export default function GerarFormularioCelular() {
     return valor && valor.trim() !== "" ? valor : "Não fornecida";
   }
 
+  function valorOuNaoFornecidoPDF(valor) {
+    return textoPDF(valor, "NÃO FORNECIDA");
+  }
+
   function gerarPDF() {
-  if (!celular) return;
+    if (!celular) return;
 
-  const doc = new jsPDF("p", "mm", "a4");
+    const doc = new jsPDF("p", "mm", "a4");
+    const pageWidth = doc.internal.pageSize.getWidth();
 
-  // ========================================
-  // CABEÇALHO PADRÃO COGER
-  // ========================================
+    const logoPMPR =
+      "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png";
+    const logoCOGER =
+      "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/brasao.png";
 
-  const pageWidth = doc.internal.pageSize.getWidth();
+    doc.addImage(logoCOGER, "PNG", 15, 10, 25, 25);
+    doc.addImage(logoPMPR, "PNG", pageWidth - 40, 10, 25, 25);
 
-  const logoPMPR =
-    "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png";
-
-  const logoCOGER =
-    "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/brasao.png";
-
-  // Logos
-  doc.addImage(logoCOGER, "PNG", 15, 10, 25, 25);
-  doc.addImage(logoPMPR, "PNG", pageWidth - 40, 10, 25, 25);
-
-  // Texto institucional
-  doc.setFont("times", "bold");
-  doc.setFontSize(13);
-
-  doc.text(
-    "POLÍCIA MILITAR DO PARANÁ",
-    pageWidth / 2,
-    18,
-    { align: "center" }
-  );
-
-  doc.text(
-    "CORREGEDORIA-GERAL",
-    pageWidth / 2,
-    25,
-    { align: "center" }
-  );
-
-  doc.text(
-    "SEÇÃO DE ASSUNTOS INTERNOS",
-    pageWidth / 2,
-    32,
-    { align: "center" }
-  );
-
-  // Linha divisória
-  doc.line(15, 40, pageWidth - 15, 40);
-
-  // Título do documento
-  doc.setFontSize(12);
-
-  doc.text(
-    "FORMULÁRIO DE APREENSÃO DE APARELHO CELULAR",
-    pageWidth / 2,
-    50,
-    { align: "center" }
-  );
-
-  // Moldura
-  doc.rect(10, 55, 190, 220);
-
-  doc.setFont("times", "normal");
-  doc.setFontSize(10);
-
-  doc.text(
-    `Gerado em ${new Date().toLocaleDateString("pt-BR")}`,
-    14,
-    62
-  );
-    autoTable(doc, {
-      startY: 68,
-      theme: "grid",
-      styles: {
-        fontSize: 10,
-      },
-      body: [
-        ["Operação", celular.nome_operacao || ""],
-        ["Alvo", celular.nome_alvo || ""],
-        ["Número do Alvo", celular.numero_alvo || ""],
-        ["Número do Item", celular.numero_item || ""],
-        ["Número do Lacre", celular.lacre || "-"],
-
-        ["Marca", celular.marca || ""],
-        ["Modelo", celular.modelo || ""],
-        ["IMEI 1", celular.imei1 || ""],
-        ["IMEI 2", celular.imei2 || ""],
-
-        ["Linha 1", celular.linha1 || ""],
-        ["Operadora 1", celular.operadora1 || ""],
-        ["SIM 1", celular.numero_sim1 || ""],
-
-        ["Linha 2", celular.linha2 || ""],
-        ["Operadora 2", celular.operadora2 || ""],
-        ["SIM 2", celular.numero_sim2 || ""],
-
-        ["Cartão de Memória", celular.cartao_memoria || ""],
-        ["Marca do Cartão", celular.marca_memoria || ""],
-        ["Capacidade", celular.capacidade_memoria || ""],
-
-        ["Estado do Aparelho", celular.estado_aparelho || ""],
-
-        ["Senha Numérica", valorOuNaoFornecido(celular.senha_numerica)],
-
-        ["Senha Gestual", valorOuNaoFornecido(celular.senha_gestual)],
-
-        ["Observações", celular.observacoes || ""],
-      ],
+    doc.setFont("times", "bold");
+    doc.setFontSize(13);
+    doc.text("POLÍCIA MILITAR DO PARANÁ", pageWidth / 2, 18, {
+      align: "center",
+    });
+    doc.text("CORREGEDORIA-GERAL", pageWidth / 2, 25, {
+      align: "center",
+    });
+    doc.text("SEÇÃO DE ASSUNTOS INTERNOS", pageWidth / 2, 32, {
+      align: "center",
     });
 
-    const paginas = doc.internal.getNumberOfPages();
+    doc.setLineWidth(0.25);
+    doc.line(15, 40, pageWidth - 15, 40);
 
-    for (let i = 1; i <= paginas; i++) {
-      doc.setPage(i);
+    doc.setFontSize(12);
+    doc.text(
+      "FORMULÁRIO DE APREENSÃO DE APARELHO CELULAR",
+      pageWidth / 2,
+      50,
+      { align: "center" },
+    );
 
-      doc.setFontSize(9);
+    let y = 63;
+    y = tituloSecao(doc, "Identificação e Dados do Aparelho", y, {
+      alturaReserva: 30,
+    });
 
-      doc.text(`Página ${i} de ${paginas}`, 196, 290, { align: "right" });
-    }
+    autoTable(doc, {
+      ...ESTILO_TABELA_IMPRESSAO,
+      startY: y,
+      body: [
+        ["OPERAÇÃO", textoPDF(celular.nome_operacao, "")],
+        ["ALVO", textoPDF(celular.nome_alvo, "")],
+        ["NÚMERO DO ALVO", textoPDF(celular.numero_alvo, "")],
+        ["NÚMERO DO ITEM", textoPDF(celular.numero_item, "")],
+        ["NÚMERO DO LACRE", textoPDF(celular.lacre)],
+        ["MARCA", textoPDF(celular.marca, "")],
+        ["MODELO", textoPDF(celular.modelo, "")],
+        ["IMEI 1", textoPDF(celular.imei1, "")],
+        ["IMEI 2", textoPDF(celular.imei2, "")],
+        ["LINHA 1", textoPDF(celular.linha1, "")],
+        ["OPERADORA 1", textoPDF(celular.operadora1, "")],
+        ["SIM 1", textoPDF(celular.numero_sim1, "")],
+        ["LINHA 2", textoPDF(celular.linha2, "")],
+        ["OPERADORA 2", textoPDF(celular.operadora2, "")],
+        ["SIM 2", textoPDF(celular.numero_sim2, "")],
+        ["CARTÃO DE MEMÓRIA", textoPDF(celular.cartao_memoria, "")],
+        ["MARCA DO CARTÃO", textoPDF(celular.marca_memoria, "")],
+        ["CAPACIDADE", textoPDF(celular.capacidade_memoria, "")],
+        ["ESTADO DO APARELHO", textoPDF(celular.estado_aparelho, "")],
+        ["SENHA NUMÉRICA", valorOuNaoFornecidoPDF(celular.senha_numerica)],
+        ["SENHA GESTUAL", valorOuNaoFornecidoPDF(celular.senha_gestual)],
+        ["OBSERVAÇÕES", textoPDF(celular.observacoes, "")],
+      ],
+      margin: { left: 15, right: 15, bottom: 20 },
+      styles: {
+        ...ESTILO_TABELA_IMPRESSAO.styles,
+        fontSize: 9.2,
+        cellPadding: 2.3,
+      },
+      columnStyles: {
+        0: {
+          cellWidth: 48,
+          fontStyle: "bold",
+          halign: "left",
+          fillColor: [255, 255, 255],
+        },
+        1: { cellWidth: 132 },
+      },
+    });
+
+    adicionarRodapePaginas(doc, "FORMULÁRIO DE APREENSÃO DE APARELHO CELULAR");
 
     const nomeArquivo =
-  `Formulario_Celular_` +
-  `${(celular.nome_operacao || "OPERACAO")
-    .replace(/[^\w\s]/gi, "")
-    .replace(/\s+/g, "_")}` +
-  `_Alvo_${celular.numero_alvo || "0"}` +
-  `_Item_${celular.numero_item || "0"}.pdf`;
+      `Formulario_Celular_` +
+      `${(celular.nome_operacao || "OPERACAO")
+        .replace(/[^\w\s]/gi, "")
+        .replace(/\s+/g, "_")}` +
+      `_Alvo_${celular.numero_alvo || "0"}` +
+      `_Item_${celular.numero_item || "0"}.pdf`;
 
-doc.save(nomeArquivo);
+    doc.save(nomeArquivo);
   }
+
   console.log("loading:", loading);
   console.log("celular:", celular);
 

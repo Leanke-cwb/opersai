@@ -3,6 +3,23 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabase/client";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import {
+  ESTILO_TABELA_IMPRESSAO,
+  adicionarRodapePaginas,
+  escreverCampoQuebravel,
+  escreverParagrafoFormal,
+  garantirEspaco,
+  tituloSecao,
+} from "../utils/pdfFormal";
+
+function textoPDF(valor, padrao = "-") {
+  const texto =
+    valor === null || valor === undefined || String(valor).trim() === ""
+      ? padrao
+      : String(valor).trim();
+
+  return texto.toLocaleUpperCase("pt-BR");
+}
 
 function cleanUUID(uuidString) {
   if (!uuidString) return null;
@@ -32,6 +49,7 @@ async function gerarCertidao(hash, alvo, operacao, comandante) {
   const numeroAlvo = alvo?.numero_alvo || "000";
   const certDoc = new jsPDF();
   const pageWidth = certDoc.internal.pageSize.getWidth();
+  const pageHeight = certDoc.internal.pageSize.getHeight();
 
   const logoPMPR =
     "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png";
@@ -49,8 +67,7 @@ async function gerarCertidao(hash, alvo, operacao, comandante) {
   certDoc.text("CORREGEDORIA-GERAL", pageWidth / 2, 27, {
     align: "center",
   });
-  
-
+  certDoc.setLineWidth(0.25);
   certDoc.line(15, 40, pageWidth - 15, 40);
 
   certDoc.setFontSize(12);
@@ -58,50 +75,74 @@ async function gerarCertidao(hash, alvo, operacao, comandante) {
     align: "center",
   });
 
-  certDoc.setFont("times", "normal");
-  certDoc.setFontSize(11);
+  let y = 64;
+  y = escreverParagrafoFormal(
+    certDoc,
+    "Certifico, para os devidos fins, que o documento digital denominado AUTO CIRCUNSTANCIADO DE BUSCA E APREENSÃO, abaixo identificado, foi gerado eletronicamente e possui código HASH SHA-256 para verificação de sua integridade.",
+    y,
+  );
 
-  const dataAtual = new Date().toLocaleString("pt-BR");
-
-  const texto = `
-  CERTIFICO, para os devidos fins, que o documento digital denominado AUTO CIRCUNSTANCIADO DE
-BUSCA E APREENSÃO, referente à operação abaixo identificada, foi gerado eletronicamente e possui
-o seguinte código HASH SHA-256 para verificação de integridade:
-
-OPERAÇÃO: ${operacao?.nome_operacao || "—"}
-
-ALVO Nº: ${alvo?.numero_alvo || "—"}
-
-INVESTIGADO: ${alvo?.nome || "—"}
-
-DATA/HORA DA GERAÇÃO: ${dataAtual}
-
-HASH SHA-256:
-
-${hash}
-
-  A autenticidade e integridade do arquivo poderão ser verificadas mediante conferência do hash acima,
-sendo que qualquer alteração posterior invalidará esta certidão.
-`;
-
-  certDoc.text(texto, 14, 70, {
-    maxWidth: pageWidth - 28,
-    align: "left",
+  y = tituloSecao(certDoc, "Identificação do Documento", y + 2, {
+    alturaReserva: 40,
   });
-  certDoc.line(60, 250, 150, 250);
+  y = escreverCampoQuebravel(
+    certDoc,
+    "OPERAÇÃO",
+    textoPDF(operacao?.nome_operacao, "—"),
+    y,
+  );
+  y = escreverCampoQuebravel(
+    certDoc,
+    "ALVO Nº",
+    textoPDF(alvo?.numero_alvo, "—"),
+    y,
+  );
+  y = escreverCampoQuebravel(
+    certDoc,
+    "INVESTIGADO",
+    textoPDF(alvo?.nome, "—"),
+    y,
+  );
+  y = escreverCampoQuebravel(
+    certDoc,
+    "DATA/HORA DA GERAÇÃO",
+    textoPDF(new Date().toLocaleString("pt-BR"), "—"),
+    y,
+  );
 
+  y = tituloSecao(certDoc, "Hash SHA-256", y + 4, { alturaReserva: 28 });
+  certDoc.setFont("courier", "normal");
+  certDoc.setFontSize(9.5);
+  const linhasHash = certDoc.splitTextToSize(String(hash || "").toUpperCase(), pageWidth - 30);
+  certDoc.text(linhasHash, 15, y + 2);
+  y += linhasHash.length * 5 + 8;
+
+  y = escreverParagrafoFormal(
+    certDoc,
+    "A autenticidade e a integridade do arquivo poderão ser verificadas mediante conferência do hash acima, sendo que qualquer alteração posterior no arquivo resultará em código distinto e invalidará a correspondência com esta certidão.",
+    y,
+  );
+
+  const assinaturaY = Math.max(y + 22, Math.min(pageHeight - 55, 235));
+  certDoc.setFont("times", "normal");
+  certDoc.line(60, assinaturaY, 150, assinaturaY);
   certDoc.setFont("times", "bold");
-  certDoc.text(comandante?.comandante_nome || "—", 105, 257, {
+  certDoc.setFontSize(10);
+  certDoc.text(textoPDF(comandante?.comandante_nome, "—"), 105, assinaturaY + 7, {
     align: "center",
   });
-
   certDoc.setFont("times", "normal");
-  certDoc.text(`${comandante?.comandante_posto_graduacao || "—"}`, 105, 263, {
-    align: "center",
-  });
+  certDoc.text(
+    textoPDF(comandante?.comandante_posto_graduacao, "—"),
+    105,
+    assinaturaY + 13,
+    { align: "center" },
+  );
 
+  adicionarRodapePaginas(certDoc, "CERTIDÃO DE INTEGRIDADE DOCUMENTAL");
   certDoc.save(`CertidaoHash_${nomeOperacao}_Alvo_${numeroAlvo}.pdf`);
 }
+
 export default function GerarAutoCircunstanciado() {
   const alvoIdRaw = localStorage.getItem("alvoId");
   const alvoId = cleanUUID(alvoIdRaw);
@@ -320,8 +361,6 @@ setTestemunhas(testemunhasComAssinatura);
     const numeroAlvo = alvo?.numero_alvo || "000";
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
-    const tableMargin = 14;
-    const photoHeight = 35;
 
     const logoPMPR =
       "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/PMPR.png";
@@ -337,7 +376,7 @@ setTestemunhas(testemunhasComAssinatura);
       align: "center",
     });
     doc.text("CORREGEDORIA-GERAL", pageWidth / 2, 27, { align: "center" });
-    
+    doc.setLineWidth(0.25);
     doc.line(15, 40, pageWidth - 15, 40);
 
     doc.setFontSize(12);
@@ -345,44 +384,61 @@ setTestemunhas(testemunhasComAssinatura);
       align: "center",
     });
 
-    let yPos = 60;
-    doc.setFont("times", "normal");
-    doc.setFontSize(11);
-    doc.text(`OPERAÇÃO: ${operacao?.nome_operacao || "—"}`, 14, yPos);
-    yPos += 7;
-    doc.text(`ALVO Nº: ${alvo?.numero_alvo || "—"}`, 14, yPos);
-    yPos += 7;
-    doc.text(
-      `COMANDANTE: ${comandante?.comandante_nome || "—"} - ${
-        comandante?.comandante_posto_graduacao || "—"
-      }`,
-      14,
-      yPos,
-    );
-    yPos += 10;
-
     const dataCumprimento = encerramento?.encerrado_em
       ? new Date(encerramento.encerrado_em).toLocaleString("pt-BR")
       : "—";
-    const justificativaTexto = encerramento?.justificativa?.trim() || "—";
+    const justificativaTexto = textoPDF(encerramento?.justificativa?.trim(), "—");
 
-    const texto = `INVESTIGADO: ${alvo?.nome || "—"}
-Aos ${dataCumprimento}, em cumprimento ao MANDADO DE BUSCA E APREENSÃO expedido junto aos Autos nº ${
-      operacao?.numero_autos || "—"
-    }, da ${operacao?.vara || "—"} /PR, compareceu no imóvel, situado à ${
-      alvo?.endereco || "—"
-    }, ${alvo?.cidade || "—"}, na presença das testemunhas.
+    let y = 62;
+    y = tituloSecao(doc, "Identificação", y, { alturaReserva: 46 });
+    y = escreverCampoQuebravel(
+      doc,
+      "OPERAÇÃO",
+      textoPDF(operacao?.nome_operacao, "—"),
+      y,
+    );
+    y = escreverCampoQuebravel(doc, "ALVO Nº", textoPDF(alvo?.numero_alvo, "—"), y);
+    y = escreverCampoQuebravel(doc, "INVESTIGADO", textoPDF(alvo?.nome, "—"), y);
+    y = escreverCampoQuebravel(
+      doc,
+      "COMANDANTE",
+      `${textoPDF(comandante?.comandante_posto_graduacao, "")} ${textoPDF(
+        comandante?.comandante_nome,
+        "—",
+      )}`.trim(),
+      y,
+    );
+    y = escreverCampoQuebravel(
+      doc,
+      "DATA/HORA DO CUMPRIMENTO",
+      textoPDF(dataCumprimento, "—"),
+      y,
+    );
 
-CERTIFICO AINDA QUE:
-${justificativaTexto}`;
-    doc.text(texto, 14, yPos, { maxWidth: pageWidth - 28 });
+    y = tituloSecao(doc, "Cumprimento do Mandado", y + 4, { alturaReserva: 30 });
+    y = escreverParagrafoFormal(
+      doc,
+      `Em cumprimento ao MANDADO DE BUSCA E APREENSÃO expedido nos Autos nº ${textoPDF(
+        operacao?.numero_autos,
+        "—",
+      )}, da ${textoPDF(operacao?.vara, "—")} /PR, a equipe compareceu ao imóvel situado à ${textoPDF(
+        alvo?.endereco,
+        "—",
+      )}, município de ${textoPDF(
+        alvo?.cidade,
+        "—",
+      )}, onde foram adotadas as providências pertinentes, na presença das testemunhas relacionadas neste documento.`,
+      y,
+    );
+
+    y = tituloSecao(doc, "Certifico Ainda Que", y + 2, { alturaReserva: 25 });
+    y = escreverParagrafoFormal(doc, justificativaTexto, y, {
+      espacoDepois: 7,
+    });
 
     if (itens.length > 0) {
-      let startY = yPos + 50;
-      doc.text("Itens Apreendidos:", 14, startY);
-      startY += 8;
+      y = tituloSecao(doc, "Itens Apreendidos", y + 2, { alturaReserva: 30 });
 
-      // Fotos em base64
       const itensComBase64 = await Promise.all(
         itens.map(async (item) => {
           const base64Fotos = await Promise.all(
@@ -403,29 +459,38 @@ ${justificativaTexto}`;
         }),
       );
 
-      // tabela
-      const photoSize = 25; // tamanho fixo das fotos
-      const photoPadding = 2; // espaçamento interno
+      const photoSize = 25;
+      const photoPadding = 2;
 
       autoTable(doc, {
-        startY,
-        head: [
-          ["Item nº", "Quantidade", "Lacre nº", "Descrição", "Local", "Fotos"],
-        ],
+        ...ESTILO_TABELA_IMPRESSAO,
+        startY: y,
+        rowPageBreak: "avoid",
+        head: [["ITEM Nº", "QUANTIDADE", "LACRE Nº", "DESCRIÇÃO", "LOCAL", "FOTOS"]],
         body: itensComBase64.map((item, i) => [
           i + 1,
-          item.quantidade_item || "",
-          item.lacre || "",
-          item.descricao || "",
-          item.local_encontrado || "",
+          textoPDF(item.quantidade_item, ""),
+          textoPDF(item.lacre, ""),
+          textoPDF(item.descricao, ""),
+          textoPDF(item.local_encontrado, ""),
           item.base64Fotos.length > 0 ? "" : "—",
         ]),
-        theme: "grid",
-        headStyles: { fillColor: [230, 230, 230] },
-        columnStyles: { 3: { cellWidth: 40 }, 5: { cellWidth: 60 } },
+        margin: { left: 14, right: 14, bottom: 20 },
+        styles: {
+          ...ESTILO_TABELA_IMPRESSAO.styles,
+          fontSize: 8,
+          cellPadding: 1.8,
+        },
+        columnStyles: {
+          0: { cellWidth: 13, halign: "center" },
+          1: { cellWidth: 20, halign: "center" },
+          2: { cellWidth: 22 },
+          3: { cellWidth: 42 },
+          4: { cellWidth: 35 },
+          5: { cellWidth: 55 },
+        },
         didDrawCell: (data) => {
           if (data.section === "body" && data.column.index === 5) {
-            // ✅ GUARDA NECESSÁRIA (SÓ ISSO)
             if (
               !data.row ||
               data.row.index == null ||
@@ -436,20 +501,13 @@ ${justificativaTexto}`;
             }
 
             const fotos = itensComBase64[data.row.index].base64Fotos;
-
-            if (fotos.length) {
-              fotos.slice(0, 2).forEach((img, idx) => {
-                const imgX =
-                  data.cell.x + photoPadding + idx * (photoSize + photoPadding);
-                const imgY = data.cell.y + photoPadding;
-
-                doc.addImage(img, "JPEG", imgX, imgY, photoSize, photoSize);
-              });
-            }
+            fotos.slice(0, 2).forEach((img, idx) => {
+              const imgX = data.cell.x + photoPadding + idx * (photoSize + photoPadding);
+              const imgY = data.cell.y + photoPadding;
+              doc.addImage(img, "JPEG", imgX, imgY, photoSize, photoSize);
+            });
           }
         },
-
-        // aumenta a altura das células para acomodar as fotos
         didParseCell: (data) => {
           if (data.section === "body" && data.column.index === 5) {
             data.cell.styles.minCellHeight = photoSize + photoPadding * 2;
@@ -457,215 +515,116 @@ ${justificativaTexto}`;
         },
       });
 
-      let finalY = doc.lastAutoTable.finalY || startY + 20;
-      const totalItens = itens.length;
-      doc.text(
-        `E sendo o que havia para relacionar, totalizando ${totalItens} ${
-          totalItens === 1 ? "item" : "itens"
-        }, deu-se por encerrada a presente busca.`,
-        14,
-        finalY + 10,
+      y = doc.lastAutoTable?.finalY || y + 30;
+      y = escreverParagrafoFormal(
+        doc,
+        `E, sendo o que havia para relacionar, totalizando ${itens.length} ${
+          itens.length === 1 ? "item" : "itens"
+        }, deu-se por encerrada a presente relação de bens apreendidos.`,
+        y + 8,
+        { espacoDepois: 6 },
       );
+    }
 
-      // tabela policiais
-      const posTabela = finalY + 30;
-      doc.setFont("times", "bold");
-      doc.text("Policiais Executores do Mandado de Busca", 14, posTabela);
+    if (policiais.length > 0) {
+      y = garantirEspaco(doc, y + 4, 35);
+      y = tituloSecao(doc, "Policiais Executores do Mandado de Busca", y, {
+        alturaReserva: 30,
+      });
+
       autoTable(doc, {
-
-  startY: posTabela + 8,
-
-  head: [
-    [
-      "ID",
-      "Posto",
-      "Nome Completo",
-      "CPF",
-      "Unidade",
-      "Função"
-    ]
-  ],
-
-  body: policiais.map((p) => [
-
-    p.id,
-
-    p.posto,
-
-    p.nome_completo,
-
-    p.identificacao,
-
-    p.unidade,
-
-    p.funcao
-
-  ]),
-
-  theme: "grid",
-
-  styles: {
-    fontSize: 7,
-    cellPadding: 1.5,
-  },
-
-  columnStyles: {
-    0: { cellWidth: 8 },
-    1: { cellWidth: 18 },
-    2: { cellWidth: 50 },
-    3: { cellWidth: 35 },
-    4: { cellWidth: 40 },
-    5: { cellWidth: 25 },
-  },
-
-  headStyles: {
-    fillColor: [230, 230, 230]
-  },
-
-});
-
-
-// ===============================
-// TESTEMUNHAS
-// ===============================
-
-
-const posTestemunhas =
-  doc.lastAutoTable.finalY + 25;
-
-
-doc.setFont("times", "bold");
-
-doc.text(
-  "Testemunas presentes no Cumprimento do Mandado de Busca",
-  14,
-  posTestemunhas
-);
-
-
-
-autoTable(doc, {
-
-  startY: posTestemunhas + 8,
-
-  head: [
-    [
-      "Nome Completo",
-      "CPF",
-      "Assinatura"
-    ]
-  ],
-
-  body: testemunhas.map((t)=>[
-
-    t.nome_completo || "—",
-
-    t.cpf || "—",
-
-    ""
-
-  ]),
-
-  theme:"grid",
-
-  headStyles:{
-    fillColor:[230,230,230]
-  },
-
-
-  // mesmo padrão da tabela de itens
-  styles:{
-    cellPadding:2
-  },
-
-
-  columnStyles:{
-
-    0:{
-      cellWidth:70
-    },
-
-    1:{
-      cellWidth:45
-    },
-
-    2:{
-      cellWidth:60
+        ...ESTILO_TABELA_IMPRESSAO,
+        startY: y,
+        head: [["ID", "POSTO", "NOME COMPLETO", "CPF", "UNIDADE", "FUNÇÃO"]],
+        body: policiais.map((p) => [
+          p.id,
+          textoPDF(p.posto, "—"),
+          textoPDF(p.nome_completo, "—"),
+          textoPDF(p.identificacao, "—"),
+          textoPDF(p.unidade, "—"),
+          textoPDF(p.funcao, "—"),
+        ]),
+        margin: { left: 14, right: 14, bottom: 20 },
+        styles: {
+          ...ESTILO_TABELA_IMPRESSAO.styles,
+          fontSize: 7.5,
+          cellPadding: 1.8,
+        },
+        columnStyles: {
+          0: { cellWidth: 8, halign: "center" },
+          1: { cellWidth: 19 },
+          2: { cellWidth: 50 },
+          3: { cellWidth: 34 },
+          4: { cellWidth: 40 },
+          5: { cellWidth: 25 },
+        },
+      });
+      y = doc.lastAutoTable?.finalY || y + 30;
     }
 
-  },
+    if (testemunhas.length > 0) {
+      y = garantirEspaco(doc, y + 10, 45);
+      y = tituloSecao(doc, "Testemunhas Presentes no Cumprimento do Mandado de Busca", y, {
+        alturaReserva: 38,
+      });
 
-
-  didParseCell:(data)=>{
-
-    if(
-      data.section==="body" &&
-      data.column.index===2
-    ){
-
-      data.cell.styles.minCellHeight = 25;
-
+      autoTable(doc, {
+        ...ESTILO_TABELA_IMPRESSAO,
+        startY: y,
+        rowPageBreak: "avoid",
+        head: [["NOME COMPLETO", "CPF", "ASSINATURA"]],
+        body: testemunhas.map((t) => [
+          textoPDF(t.nome_completo, "—"),
+          textoPDF(t.cpf, "—"),
+          "",
+        ]),
+        margin: { left: 14, right: 14, bottom: 20 },
+        styles: {
+          ...ESTILO_TABELA_IMPRESSAO.styles,
+          fontSize: 8.5,
+          cellPadding: 2,
+        },
+        columnStyles: {
+          0: { cellWidth: 70 },
+          1: { cellWidth: 45 },
+          2: { cellWidth: 60 },
+        },
+        didParseCell: (data) => {
+          if (data.section === "body" && data.column.index === 2) {
+            data.cell.styles.minCellHeight = 25;
+          }
+        },
+        didDrawCell: (data) => {
+          if (data.section === "body" && data.column.index === 2) {
+            const testemunha = testemunhas[data.row.index];
+            if (testemunha?.assinaturaUrl) {
+              doc.addImage(
+                testemunha.assinaturaUrl,
+                "PNG",
+                data.cell.x + 5,
+                data.cell.y + 2,
+                35,
+                20,
+              );
+            }
+          }
+        },
+      });
     }
 
-  },
-
-
-  didDrawCell:(data)=>{
-
-    if(
-
-      data.section==="body" &&
-
-      data.column.index===2
-
-    ){
-
-      const testemunha =
-        testemunhas[data.row.index];
-
-
-      if(testemunha?.assinaturaUrl){
-
-
-        doc.addImage(
-
-          testemunha.assinaturaUrl,
-
-          "PNG",
-
-          data.cell.x + 5,
-
-          data.cell.y + 2,
-
-          35,
-
-          20
-
-        );
-
-
-      }
-
-    }
-
-  }
-
-});
-    }
+    adicionarRodapePaginas(doc, "AUTO CIRCUNSTANCIADO DE BUSCA E APREENSÃO");
 
     const pdfArrayBuffer = doc.output("arraybuffer");
     const blob = new Blob([pdfArrayBuffer], { type: "application/pdf" });
-
     const hash = await gerarHashPDF(blob);
 
-    // primeiro baixa o Auto Circunstanciado
     doc.save(`AutoCircunstanciado_${nomeOperacao}_Alvo_${numeroAlvo}.pdf`);
 
-    // espera o navegador processar
     setTimeout(async () => {
       await gerarCertidao(hash, alvo, operacao, comandante);
     }, 1500);
   }
+
   if (carregando) return <p>Carregando dados...</p>;
 
   const textoAuto = `INVESTIGADO: ${alvo?.nome}
