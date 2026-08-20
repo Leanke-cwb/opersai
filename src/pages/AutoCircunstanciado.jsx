@@ -138,6 +138,13 @@ export default function AutoCircunstanciado() {
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
+      <button
+        onClick={() => navigate(-1)}
+        className="mb-4 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
+      >
+        Voltar
+      </button>
+
       <h1 className="text-2xl mb-6 font-bold">Gerar Documentação</h1>
 
       <label htmlFor="operacao-select" className="block mb-2">

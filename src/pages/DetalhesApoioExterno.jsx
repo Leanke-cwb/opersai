@@ -20,6 +20,18 @@ function textoPDF(valor, padrao = "-") {
   return texto.toLocaleUpperCase("pt-BR");
 }
 
+function formatarCPF(valor) {
+  if (!valor) return "-";
+
+  const digitos = String(valor).replace(/\D/g, "");
+  if (digitos.length !== 11) return String(valor);
+
+  return `${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(
+    6,
+    9,
+  )}-${digitos.slice(9, 11)}`;
+}
+
 function formatarData(data) {
   if (!data) return "-";
 
@@ -336,7 +348,7 @@ export default function DetalhesApoioExterno() {
     doc.text(`NOME COMPLETO: ${textoPDF(apoio.responsavel_nome)}`, 15, yFinal + 3);
     doc.text(`FUNÇÃO/CARGO: ${textoPDF(apoio.responsavel_funcao)}`, 15, yFinal + 12);
     doc.text(
-      `DOCUMENTO/MATRÍCULA: ${textoPDF(apoio.responsavel_documento)}`,
+      `CPF: ${textoPDF(formatarCPF(apoio.responsavel_documento))}`,
       15,
       yFinal + 21,
     );
@@ -559,7 +571,7 @@ export default function DetalhesApoioExterno() {
               <Campo titulo="Unidade recebedora" valor={apoio.entrega_unidade} />
               <Campo titulo="Responsável pelo recebimento" valor={apoio.responsavel_nome} />
               <Campo titulo="Função/Cargo" valor={apoio.responsavel_funcao} />
-              <Campo titulo="Documento/Matrícula" valor={apoio.responsavel_documento} />
+              <Campo titulo="CPF" valor={formatarCPF(apoio.responsavel_documento)} />
               <Campo
                 titulo="Data e hora da entrega"
                 valor={formatarDataHora(apoio.entrega_data, apoio.entrega_hora)}
