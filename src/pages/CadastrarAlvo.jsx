@@ -155,22 +155,34 @@ useEffect(() => {
   const uploadImagem = async (bucket, file) => {
     if (!file) return null;
 
-    const fileName = `${Date.now()}-${file.name}`;
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      throw new Error("Usuário não autenticado para enviar imagem.");
+    }
+
+    const nomeSeguro = String(file.name || "imagem.jpg")
+      .replace(/[^a-zA-Z0-9._-]/g, "_");
+
+    // Novos arquivos ficam na pasta do próprio usuário.
+    // No banco é salvo somente o caminho interno do Storage,
+    // nunca uma URL pública.
+    const caminhoStorage = `${user.id}/${Date.now()}-${nomeSeguro}`;
 
     const { error } = await supabase.storage
       .from(bucket)
-      .upload(fileName, file);
+      .upload(caminhoStorage, file, {
+        upsert: false,
+      });
 
     if (error) {
-      alert(`Erro ao enviar imagem: ${error.message}`);
-      return null;
+      throw new Error(`Erro ao enviar imagem: ${error.message}`);
     }
 
-    const { data: publicUrlData } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(fileName);
-
-    return publicUrlData.publicUrl;
+    return caminhoStorage;
   };
 const podeAlterarAlvo = (alvo)=>{
 
@@ -272,12 +284,19 @@ return;
 
     const qrUrl = `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=${form.latitude},${form.longitude}`;
 
-    const fotoAlvoUrl = await uploadImagem("imagens-alvo", fotoAlvo);
+    let fotoAlvoUrl = null;
+    let fotoResidenciaUrl = null;
 
-    const fotoResidenciaUrl = await uploadImagem(
-      "imagens-residencia",
-      fotoResidencia,
-    );
+    try {
+      fotoAlvoUrl = await uploadImagem("imagens-alvo", fotoAlvo);
+      fotoResidenciaUrl = await uploadImagem(
+        "imagens-residencia",
+        fotoResidencia,
+      );
+    } catch (uploadError) {
+      alert(uploadError?.message || "Erro ao enviar imagem.");
+      return;
+    }
 
     let error;
     let data;

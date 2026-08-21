@@ -286,7 +286,7 @@ const testemunhasComAssinatura = await Promise.all(
 
         .createSignedUrl(
           testemunha.assinatura_foto,
-          31536000
+          600
         );
 
 
@@ -334,7 +334,7 @@ setTestemunhas(testemunhasComAssinatura);
                 try {
                   const { data } = await supabase.storage
                     .from("auto_itens_fotos")
-                    .createSignedUrl(fileName, 31536000);
+                    .createSignedUrl(fileName, 600);
                   return data?.signedUrl || null;
                 } catch {
                   return null;

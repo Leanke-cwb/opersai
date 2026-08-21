@@ -104,7 +104,7 @@ export default function ConsultaAlvos() {
 
           const { data, error } = await supabase.storage
             .from("imagens-alvo")
-            .createSignedUrl(caminhoAlvo, 60);
+            .createSignedUrl(caminhoAlvo, 600);
           urls[alvo.id].fotoAlvo = error ? null : data.signedUrl;
         } else {
           urls[alvo.id].fotoAlvo = null;
@@ -118,7 +118,7 @@ export default function ConsultaAlvos() {
 
           const { data, error } = await supabase.storage
             .from("imagens-residencia")
-            .createSignedUrl(caminhoResidencia, 60);
+            .createSignedUrl(caminhoResidencia, 600);
           urls[alvo.id].fotoResidencia = error ? null : data.signedUrl;
         } else {
           urls[alvo.id].fotoResidencia = null;
