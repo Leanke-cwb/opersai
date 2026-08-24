@@ -145,8 +145,8 @@ export default function ApoiosExternos() {
   }, [apoios, busca, status]);
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8 px-4">
-      <div className="max-w-6xl mx-auto bg-white rounded-xl shadow-md p-6">
+    <div className="gecor-work-page min-h-screen bg-gray-100 py-8 px-4">
+      <div className="gecor-work-panel max-w-6xl mx-auto bg-white rounded-xl shadow-md p-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Apoios Externos</h1>

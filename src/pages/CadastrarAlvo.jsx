@@ -428,7 +428,7 @@ const alvosFiltrados = alvos.filter((alvo) =>
 );
 
   return (
-    <div className="p-6 max-w-3xl mx-auto bg-white rounded-xl shadow-md mt-10">
+    <div className="gecor-work-panel p-6 max-w-3xl mx-auto bg-white rounded-xl shadow-md mt-10">
       <button
         onClick={() => navigate("/home")}
         className="mb-4 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded flex items-center gap-2"

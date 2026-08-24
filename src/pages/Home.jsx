@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabase/client";
+import gecorLogo from "../assets/gecor-logo.png";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -68,66 +69,167 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-xl shadow-md w-full max-w-md">
-        <h1 className="text-2xl font-bold mb-6 text-center">
-          Painel Principal
-        </h1>
+    <div className="gecor-home-page">
+      <div className="gecor-home-shell">
+        <header className="gecor-home-header">
+          <div className="gecor-brand">
+            <img
+              src={gecorLogo}
+              alt="GECOR"
+              className="gecor-brand__logo"
+            />
+            <div>
+              <h1 className="gecor-brand__name">GECOR</h1>
+              <p className="gecor-brand__subtitle">
+                Gestão Eletrônica de Correição, Operações e Registros
+              </p>
+            </div>
+          </div>
 
-        <div className="space-y-4">
-          <button
-            onClick={() => navigate("/operacao")}
-            className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition"
-          >
-            Cadastrar Operação
-          </button>
+          <div className="gecor-home-header-status" aria-label="Ambiente institucional">
+            <span className="gecor-home-header-status__dot" />
+            <span>Ambiente institucional</span>
+          </div>
+        </header>
 
-          <button
-            onClick={() => navigate("/alvo")}
-            className="w-full bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 transition"
-          >
-            Cadastrar Alvo
-          </button>
+        <main className="gecor-home-panel">
+          <div className="gecor-home-intro">
+            <div>
+              <p className="gecor-home-eyebrow">Painel operacional</p>
+              <h2 className="gecor-home-title">Painel Principal</h2>
+              <p className="gecor-home-description">
+                Selecione o módulo que deseja acessar.
+              </p>
+            </div>
+            <div className="gecor-home-intro-mark" aria-hidden="true">
+              G
+            </div>
+          </div>
 
-          <button
-            onClick={() => navigate("/consulta-alvos")}
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition"
-          >
-            Consultar Alvos
-          </button>
+          <section className="gecor-home-section" aria-labelledby="gecor-operacional">
+            <div className="gecor-home-section-heading">
+              <div>
+                <h3 id="gecor-operacional">Operacional</h3>
+                <p>Cadastro, consulta e produção documental.</p>
+              </div>
+              <span className="gecor-home-section-line" />
+            </div>
 
-          <button
-            onClick={() => navigate("/apoios-externos")}
-            className="w-full bg-orange-500 text-white py-2 px-4 rounded hover:bg-orange-600 transition"
-          >
-            Apoios Externos
-          </button>
+            <div className="gecor-home-grid">
+              <button
+                onClick={() => navigate("/operacao")}
+                className="gecor-home-card"
+              >
+                <span className="gecor-home-card__code">OP</span>
+                <span className="gecor-home-card__content">
+                  <span className="gecor-home-card__title">Operações</span>
+                  <span className="gecor-home-card__desc">
+                    Cadastro e gerenciamento de operações.
+                  </span>
+                </span>
+                <span className="gecor-home-card__arrow" aria-hidden="true">→</span>
+              </button>
 
-          <button
-            onClick={() => navigate("/auto-circunstanciado")}
-            className="w-full bg-purple-500 text-white py-2 px-4 rounded hover:bg-purple-600 transition"
-          >
-            Gerar Auto Circunstanciado
-          </button>
+              <button
+                onClick={() => navigate("/alvo")}
+                className="gecor-home-card"
+              >
+                <span className="gecor-home-card__code">AL</span>
+                <span className="gecor-home-card__content">
+                  <span className="gecor-home-card__title">Cadastrar Alvo</span>
+                  <span className="gecor-home-card__desc">
+                    Inclusão e atualização de dados de alvos.
+                  </span>
+                </span>
+                <span className="gecor-home-card__arrow" aria-hidden="true">→</span>
+              </button>
+
+              <button
+                onClick={() => navigate("/consulta-alvos")}
+                className="gecor-home-card"
+              >
+                <span className="gecor-home-card__code">CO</span>
+                <span className="gecor-home-card__content">
+                  <span className="gecor-home-card__title">Consultar Alvos</span>
+                  <span className="gecor-home-card__desc">
+                    Consulta dos registros por operação.
+                  </span>
+                </span>
+                <span className="gecor-home-card__arrow" aria-hidden="true">→</span>
+              </button>
+
+              <button
+                onClick={() => navigate("/apoios-externos")}
+                className="gecor-home-card"
+              >
+                <span className="gecor-home-card__code">AP</span>
+                <span className="gecor-home-card__content">
+                  <span className="gecor-home-card__title">Apoios Externos</span>
+                  <span className="gecor-home-card__desc">
+                    Registro de apoios prestados a outros órgãos.
+                  </span>
+                </span>
+                <span className="gecor-home-card__arrow" aria-hidden="true">→</span>
+              </button>
+
+              <button
+                onClick={() => navigate("/auto-circunstanciado")}
+                className="gecor-home-card"
+              >
+                <span className="gecor-home-card__code">DC</span>
+                <span className="gecor-home-card__content">
+                  <span className="gecor-home-card__title">Documentação</span>
+                  <span className="gecor-home-card__desc">
+                    Auto circunstanciado e documentos operacionais.
+                  </span>
+                </span>
+                <span className="gecor-home-card__arrow" aria-hidden="true">→</span>
+              </button>
+            </div>
+          </section>
 
           {!carregandoPerfil && podeEditarUsuarios && (
-            <button
-              onClick={() => navigate("/auditoria")}
-              className="w-full bg-teal-700 text-white py-2 px-4 rounded hover:bg-teal-800 transition"
-            >
-              Auditoria
-            </button>
-          )}
+            <section className="gecor-home-section gecor-home-section--management" aria-labelledby="gecor-gestao">
+              <div className="gecor-home-section-heading">
+                <div>
+                  <h3 id="gecor-gestao">Gestão e Controle</h3>
+                  <p>Recursos administrativos e de rastreabilidade.</p>
+                </div>
+                <span className="gecor-home-section-line" />
+              </div>
 
-          {!carregandoPerfil && podeEditarUsuarios && (
-            <button
-              onClick={abrirEdicaoUsuarios}
-              className="w-full bg-slate-700 text-white py-2 px-4 rounded hover:bg-slate-800 transition"
-            >
-              Editar Usuários
-            </button>
+              <div className="gecor-home-grid gecor-home-grid--management">
+                <button
+                  onClick={() => navigate("/auditoria")}
+                  className="gecor-home-card gecor-home-card--admin"
+                >
+                  <span className="gecor-home-card__code">AU</span>
+                  <span className="gecor-home-card__content">
+                    <span className="gecor-home-card__title">Auditoria</span>
+                    <span className="gecor-home-card__desc">
+                      Histórico e rastreabilidade das alterações.
+                    </span>
+                  </span>
+                  <span className="gecor-home-card__arrow" aria-hidden="true">→</span>
+                </button>
+
+                <button
+                  onClick={abrirEdicaoUsuarios}
+                  className="gecor-home-card gecor-home-card--admin"
+                >
+                  <span className="gecor-home-card__code">US</span>
+                  <span className="gecor-home-card__content">
+                    <span className="gecor-home-card__title">Editar Usuários</span>
+                    <span className="gecor-home-card__desc">
+                      Administração de usuários autorizados.
+                    </span>
+                  </span>
+                  <span className="gecor-home-card__arrow" aria-hidden="true">→</span>
+                </button>
+              </div>
+            </section>
           )}
-        </div>
+        </main>
       </div>
     </div>
   );

@@ -642,7 +642,7 @@ CERTIFICO AINDA QUE:
 ${encerramento?.justificativa?.trim() || "—"}`;
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="gecor-work-panel p-8 max-w-5xl mx-auto">
       <h1 className="text-2xl mb-6 font-bold">
         AUTO CIRCUNSTANCIADO DE BUSCA e APREENSÃO
       </h1>

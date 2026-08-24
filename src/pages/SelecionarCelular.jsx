@@ -110,7 +110,7 @@ export default function SelecionarCelular() {
   }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div className="gecor-work-panel p-8 max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Selecione o Celular</h1>
 

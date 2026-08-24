@@ -112,7 +112,7 @@ const auto = autos[0];
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="gecor-work-panel max-w-6xl mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">
           Seleção do 2º Custodiante

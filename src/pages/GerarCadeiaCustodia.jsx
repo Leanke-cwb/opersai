@@ -272,7 +272,7 @@ export default function GerarCadeiaCustodia() {
   }
 
   return (
-    <div className="p-6">
+    <div className="gecor-work-panel p-6">
       <h2 className="text-xl font-bold">
         {loading ? "Gerando PDF..." : "PDF gerado com sucesso"}
       </h2>

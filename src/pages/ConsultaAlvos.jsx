@@ -203,7 +203,7 @@ export default function ConsultaAlvos() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto bg-white rounded-xl shadow-md mt-10">
+    <div className="gecor-work-panel p-6 max-w-5xl mx-auto bg-white rounded-xl shadow-md mt-10">
       {/* Botão voltar home */}
       <button
         onClick={() => navigate("/home")}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabase/client";
+import gecorLogo from "../assets/gecor-logo.png";
 
 const GRADUACOES_PM = [
   "Soldado",
@@ -173,115 +174,122 @@ export default function Register() {
   };
 
   return (
-    <div className="max-w-md mx-auto mt-10 p-6 border rounded shadow">
-      <h2 className="text-2xl font-bold mb-4">
-        Cadastro
-      </h2>
+    <div className="gecor-register-page">
+      <div className="gecor-register-shell">
+        <div className="gecor-brand gecor-register-brand">
+          <img
+            src={gecorLogo}
+            alt="GECOR"
+            className="gecor-brand__logo"
+          />
+          <div>
+            <h1 className="gecor-brand__name">GECOR</h1>
+            <p className="gecor-brand__subtitle">
+              Gestão Eletrônica de Correição, Operações e Registros
+            </p>
+          </div>
+        </div>
 
-      <form
-        onSubmit={handleRegister}
-        className="space-y-4"
-      >
-        <select
-          name="posto_graduacao"
-          value={form.posto_graduacao}
-          onChange={handleChange}
-          className="w-full border p-2 rounded"
-          required
-        >
-          <option value="">
-            Selecione a Graduação
-          </option>
+        <div className="gecor-register-card">
+          <h2 className="gecor-register-title">Cadastro de usuário</h2>
+          <p className="gecor-register-description">
+            Preencha os dados institucionais para solicitar acesso ao sistema.
+          </p>
 
-          {GRADUACOES_PM.map((g) => (
-            <option key={g} value={g}>
-              {g}
-            </option>
-          ))}
-        </select>
-
-        <input
-          type="text"
-          name="nome"
-          placeholder="Nome completo"
-          value={form.nome}
-          onChange={handleChange}
-          className="w-full border p-2 rounded"
-          required
-        />
-
-        <input
-          type="text"
-          name="cpf"
-          placeholder="CPF"
-          value={form.cpf}
-          onChange={handleChange}
-          maxLength={14}
-          className="w-full border p-2 rounded"
-          required
-        />
-
-        <input
-          type="text"
-          name="telefone"
-          placeholder="Telefone"
-          value={form.telefone}
-          onChange={handleChange}
-          className="w-full border p-2 rounded"
-          required
-        />
-
-        <select
-          name="nucleo_id"
-          value={form.nucleo_id}
-          onChange={handleChange}
-          className="w-full border p-2 rounded"
-          required
-        >
-          <option value="">
-            Selecione o Núcleo
-          </option>
-
-          {nucleos.map((nucleo) => (
-            <option
-              key={nucleo.id}
-              value={nucleo.id}
+          <form onSubmit={handleRegister} className="gecor-register-grid">
+            <select
+              name="posto_graduacao"
+              value={form.posto_graduacao}
+              onChange={handleChange}
+              className="gecor-form-control"
+              required
             >
-              {nucleo.nome}
-            </option>
-          ))}
-        </select>
+              <option value="">Selecione a Graduação</option>
 
-        <input
-          type="email"
-          name="email"
-          placeholder="E-mail Institucional"
-          value={form.email}
-          onChange={handleChange}
-          className="w-full border p-2 rounded"
-          required
-        />
+              {GRADUACOES_PM.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </select>
 
-        <input
-          type="password"
-          name="senha"
-          placeholder="Senha"
-          value={form.senha}
-          onChange={handleChange}
-          className="w-full border p-2 rounded"
-          required
-        />
+            <select
+              name="nucleo_id"
+              value={form.nucleo_id}
+              onChange={handleChange}
+              className="gecor-form-control"
+              required
+            >
+              <option value="">Selecione o Núcleo</option>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-blue-600 text-white p-2 rounded"
-        >
-          {loading
-            ? "Cadastrando..."
-            : "Cadastrar"}
-        </button>
-      </form>
+              {nucleos.map((nucleo) => (
+                <option key={nucleo.id} value={nucleo.id}>
+                  {nucleo.nome}
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="text"
+              name="nome"
+              placeholder="Nome completo"
+              value={form.nome}
+              onChange={handleChange}
+              className="gecor-form-control gecor-register-full"
+              required
+            />
+
+            <input
+              type="text"
+              name="cpf"
+              placeholder="CPF"
+              value={form.cpf}
+              onChange={handleChange}
+              maxLength={14}
+              className="gecor-form-control"
+              required
+            />
+
+            <input
+              type="text"
+              name="telefone"
+              placeholder="Telefone"
+              value={form.telefone}
+              onChange={handleChange}
+              className="gecor-form-control"
+              required
+            />
+
+            <input
+              type="email"
+              name="email"
+              placeholder="E-mail Institucional"
+              value={form.email}
+              onChange={handleChange}
+              className="gecor-form-control"
+              required
+            />
+
+            <input
+              type="password"
+              name="senha"
+              placeholder="Senha"
+              value={form.senha}
+              onChange={handleChange}
+              className="gecor-form-control"
+              required
+            />
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="gecor-primary-button gecor-register-full"
+            >
+              {loading ? "Cadastrando..." : "Cadastrar"}
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

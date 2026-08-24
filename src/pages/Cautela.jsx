@@ -296,7 +296,7 @@ export default function Cautela() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-6 bg-white shadow rounded mt-10">
+    <div className="gecor-work-panel max-w-3xl mx-auto p-6 bg-white shadow rounded mt-10">
       <div className="flex justify-between items-center mb-4">
         <button
           onClick={() => navigate(-1)}

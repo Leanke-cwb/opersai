@@ -387,19 +387,19 @@ export default function CadastrarOperacao() {
   };
 
   return (
-    <div className="p-6 max-w-3xl mx-auto bg-white rounded-xl shadow mt-10">
+    <div className="gecor-work-panel gecor-operations-panel p-6 max-w-3xl mx-auto bg-white rounded-xl shadow mt-10">
       <button
         onClick={() => navigate("/home")}
-        className="mb-4 bg-gray-300 px-4 py-2 rounded"
+        className="gecor-back-button mb-4 bg-gray-300 px-4 py-2 rounded"
       >
         ← Voltar
       </button>
 
-      <h2 className="text-2xl font-bold mb-5">
+      <h2 className="gecor-page-title text-2xl font-bold mb-5">
         {editandoId ? "Editar Operação" : "Cadastrar Operação"}
       </h2>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="gecor-operation-form space-y-4">
         <input
           name="nome_operacao"
           value={form.nome_operacao}
@@ -426,7 +426,7 @@ export default function CadastrarOperacao() {
 
 
         <div className="flex gap-2">
-          <button className="bg-green-600 text-white px-4 py-2 rounded">
+          <button className="gecor-btn gecor-btn--primary bg-green-600 text-white px-4 py-2 rounded">
             {editandoId ? "Salvar Alterações" : "Salvar"}
           </button>
 
@@ -434,7 +434,7 @@ export default function CadastrarOperacao() {
             <button
               type="button"
               onClick={limparFormulario}
-              className="bg-gray-500 text-white px-4 py-2 rounded"
+              className="gecor-btn gecor-btn--secondary bg-gray-500 text-white px-4 py-2 rounded"
             >
               Cancelar
             </button>
@@ -443,23 +443,27 @@ export default function CadastrarOperacao() {
       </form>
 
 
-      <h3 className="font-bold text-xl mt-8">Operações</h3>
+      <h3 className="gecor-section-title font-bold text-xl mt-8">Operações</h3>
 
       {operacoes.map((op) => {
         const idsCompartilhados = compartilhamentosDaOperacao(op);
 
         return (
-          <div key={op.id} className="border p-3 mt-3 rounded">
+          <div key={op.id} className="gecor-operation-card border p-3 mt-3 rounded">
             <div className="flex justify-between gap-4 items-start">
               <div>
                 <div className="font-semibold">{op.nome_operacao}</div>
 
                 {idsCompartilhados.length > 0 ? (
-                  <div className="text-sm text-blue-700 mt-1">
-                    Compartilhada com: {idsCompartilhados.map(nomeNucleo).join(", ")}
+                  <div className="gecor-status-badge gecor-status-badge--shared mt-1">
+                    <span className="gecor-status-dot" aria-hidden="true" />
+                    <span>Compartilhada com: {idsCompartilhados.map(nomeNucleo).join(", ")}</span>
                   </div>
                 ) : (
-                  <div className="text-sm text-gray-500 mt-1">Não compartilhada</div>
+                  <div className="gecor-status-badge gecor-status-badge--private mt-1">
+                    <span className="gecor-status-dot" aria-hidden="true" />
+                    <span>Não compartilhada</span>
+                  </div>
                 )}
               </div>
 
@@ -467,7 +471,7 @@ export default function CadastrarOperacao() {
                 <div className="flex flex-wrap justify-end gap-2">
                   <button
                     onClick={() => handleEdit(op)}
-                    className="bg-blue-600 text-white px-2 py-1 rounded"
+                    className="gecor-btn gecor-btn--edit bg-blue-600 text-white px-2 py-1 rounded"
                   >
                     Editar
                   </button>
@@ -478,7 +482,7 @@ export default function CadastrarOperacao() {
                         ? cancelarCompartilhamento()
                         : abrirCompartilhamento(op)
                     }
-                    className="bg-indigo-600 text-white px-2 py-1 rounded"
+                    className="gecor-btn gecor-btn--share bg-indigo-600 text-white px-2 py-1 rounded"
                   >
                     {compartilhandoId === op.id
                       ? "Fechar Compartilhamento"
@@ -489,7 +493,7 @@ export default function CadastrarOperacao() {
 
                   <button
                     onClick={() => handleDelete(op.id)}
-                    className="bg-red-600 text-white px-2 py-1 rounded"
+                    className="gecor-btn gecor-btn--danger bg-red-600 text-white px-2 py-1 rounded"
                   >
                     Excluir
                   </button>
@@ -498,7 +502,7 @@ export default function CadastrarOperacao() {
             </div>
 
             {compartilhandoId === op.id && (
-              <div className="mt-4 border-t pt-4">
+              <div className="gecor-share-panel mt-4 border-t pt-4">
                 <p className="text-sm text-gray-700 mb-3">
                   Marque os núcleos para compartilhar. Desmarque e salve para
                   descompartilhar.
@@ -529,7 +533,7 @@ export default function CadastrarOperacao() {
                     type="button"
                     onClick={() => salvarCompartilhamento(op)}
                     disabled={salvandoCompartilhamento}
-                    className="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                    className="gecor-btn gecor-btn--primary bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
                   >
                     {salvandoCompartilhamento ? "Salvando..." : "Salvar"}
                   </button>
@@ -538,7 +542,7 @@ export default function CadastrarOperacao() {
                     type="button"
                     onClick={cancelarCompartilhamento}
                     disabled={salvandoCompartilhamento}
-                    className="bg-gray-500 text-white px-4 py-2 rounded disabled:opacity-50"
+                    className="gecor-btn gecor-btn--secondary bg-gray-500 text-white px-4 py-2 rounded disabled:opacity-50"
                   >
                     Cancelar
                   </button>

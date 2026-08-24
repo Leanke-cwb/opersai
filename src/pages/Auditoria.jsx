@@ -247,13 +247,13 @@ export default function Auditoria() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-md p-5 md:p-7">
+    <div className="gecor-work-page min-h-screen bg-gray-100 p-4 md:p-8">
+      <div className="gecor-work-panel max-w-7xl mx-auto bg-white rounded-xl shadow-md p-5 md:p-7">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
           <div>
             <h1 className="text-2xl font-bold">Auditoria do Sistema</h1>
             <p className="text-sm text-gray-600 mt-1">
-              Histórico de criações, edições e exclusões registradas no OPERSAI.
+              Histórico de criações, edições e exclusões registradas no GECOR.
             </p>
           </div>
 

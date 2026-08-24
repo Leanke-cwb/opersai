@@ -1,9 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabase/client";
-
-const BACKGROUND_IMAGE_URL =
-  "https://oehaedvsgsrgtkxpovrd.supabase.co/storage/v1/object/public/figuras/coger.png";
+import gecorLogo from "../assets/gecor-logo.png";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -107,69 +105,106 @@ export default function Login() {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center"
-      style={{
-        backgroundImage: `url('${BACKGROUND_IMAGE_URL}')`,
-        backgroundSize: "contain",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-      }}
-    >
-      <form
-        onSubmit={handleLogin}
-        className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm bg-opacity-55"
-      >
-        <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
+    <div className="gecor-login-page">
+      <div className="gecor-login-shell">
+        <section className="gecor-login-identity" aria-label="Identidade GECOR">
+          <div className="gecor-brand">
+            <img
+              src={gecorLogo}
+              alt="GECOR"
+              className="gecor-brand__logo"
+            />
+            <div>
+              <h1 className="gecor-brand__name">GECOR</h1>
+              <p className="gecor-brand__subtitle">
+                Gestão Eletrônica de Correição, Operações e Registros
+              </p>
+            </div>
+          </div>
 
-        {erro && <p className="text-red-500 text-sm mb-4">{erro}</p>}
+          <div className="gecor-login-logo-wrap">
+            <img
+              src={gecorLogo}
+              alt="Símbolo GECOR"
+              className="gecor-login-logo"
+            />
+          </div>
 
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            if (erro) setErro("");
-          }}
-          className="w-full p-2 border rounded mb-4"
-          required
-          disabled={entrando}
-        />
+          <p className="gecor-login-note">
+            Gestão segura das operações e dos registros produzidos pela atividade correcional.
+          </p>
+        </section>
 
-        <input
-          type="password"
-          placeholder="Senha"
-          value={senha}
-          onChange={(e) => {
-            setSenha(e.target.value);
-            if (erro) setErro("");
-          }}
-          className="w-full p-2 border rounded mb-4"
-          required
-          disabled={entrando}
-        />
+        <section className="gecor-login-panel">
+          <form onSubmit={handleLogin} className="gecor-login-form">
+            <p className="gecor-login-eyebrow">Acesso institucional</p>
+            <h2 className="gecor-login-title">Entrar no sistema</h2>
+            <p className="gecor-login-description">
+              Utilize suas credenciais autorizadas para acessar o GECOR.
+            </p>
 
-        <button
-          type="submit"
-          className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 disabled:opacity-60"
-          disabled={entrando}
-        >
-          {entrando ? "Entrando..." : "Entrar"}
-        </button>
+            {erro && <p className="gecor-login-error">{erro}</p>}
 
-        <div className="text-center mt-4">
-          <span className="text-gray-600">Não tem conta?</span>{" "}
-          <button
-            type="button"
-            onClick={() => navigate("/register")}
-            className="text-blue-600 hover:underline"
-            disabled={entrando}
-          >
-            Cadastre-se
-          </button>
-        </div>
-      </form>
+            <div className="gecor-login-field">
+              <label className="gecor-form-label" htmlFor="gecor-email">
+                E-mail
+              </label>
+              <input
+                id="gecor-email"
+                type="email"
+                placeholder="seu.email@pm.pr.gov.br"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (erro) setErro("");
+                }}
+                className="gecor-form-control"
+                required
+                disabled={entrando}
+              />
+            </div>
+
+            <div className="gecor-login-field">
+              <label className="gecor-form-label" htmlFor="gecor-senha">
+                Senha
+              </label>
+              <input
+                id="gecor-senha"
+                type="password"
+                placeholder="Digite sua senha"
+                value={senha}
+                onChange={(e) => {
+                  setSenha(e.target.value);
+                  if (erro) setErro("");
+                }}
+                className="gecor-form-control"
+                required
+                disabled={entrando}
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="gecor-primary-button"
+              disabled={entrando}
+            >
+              {entrando ? "Entrando..." : "Entrar"}
+            </button>
+
+            <div className="gecor-login-register">
+              <span>Não tem conta?</span>{" "}
+              <button
+                type="button"
+                onClick={() => navigate("/register")}
+                className="gecor-text-button"
+                disabled={entrando}
+              >
+                Cadastre-se
+              </button>
+            </div>
+          </form>
+        </section>
+      </div>
     </div>
   );
 }

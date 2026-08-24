@@ -136,8 +136,8 @@ export default function ChefeNucleo() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-md p-6">
+    <div className="gecor-work-page min-h-screen bg-gray-100 p-6">
+      <div className="gecor-work-panel max-w-7xl mx-auto bg-white rounded-xl shadow-md p-6">
 
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">
