@@ -4,13 +4,30 @@ import { useNavigate } from "react-router-dom";
 
 export default function AdminUsuarios() {
   const [usuarios, setUsuarios] = useState([]);
+  const [nucleos, setNucleos] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const navigate = useNavigate();
 
   useEffect(() => {
     carregarUsuarios();
+    carregarNucleos();
   }, []);
+
+  async function carregarNucleos() {
+    const { data, error } = await supabase
+      .from("nucleos")
+      .select("id, nome")
+      .order("nome");
+
+    if (error) {
+      console.error(error);
+      alert("Erro ao carregar núcleos.");
+      return;
+    }
+
+    setNucleos(data || []);
+  }
 
   async function carregarUsuarios() {
     setLoading(true);
@@ -283,11 +300,27 @@ async function excluirUsuario(id) {
 </td>
 
                    <td className="border p-2">
-  <input
-    value={usuario.nucleos?.nome || ""}
-    className="border rounded p-1 w-full bg-gray-100"
-    disabled
-  />
+  <select
+    value={usuario.nucleo_id || ""}
+    onChange={(e) =>
+      atualizarCampo(
+        usuario.id,
+        "nucleo_id",
+        e.target.value
+      )
+    }
+    className="border rounded p-1 w-full bg-white"
+  >
+    <option value="" disabled>
+      Selecione o núcleo
+    </option>
+
+    {nucleos.map((nucleo) => (
+      <option key={nucleo.id} value={nucleo.id}>
+        {nucleo.nome}
+      </option>
+    ))}
+  </select>
 </td>
 
                     <td className="border p-2">
