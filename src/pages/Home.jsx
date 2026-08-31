@@ -185,6 +185,26 @@ export default function Home() {
                 </span>
                 <span className="gecor-home-card__arrow" aria-hidden="true">→</span>
               </button>
+
+              <button
+                onClick={() =>
+                  window.open(
+                    "/Manual_GECOR_Utilizacao_v1.pdf",
+                    "_blank",
+                    "noopener,noreferrer"
+                  )
+                }
+                className="gecor-home-card"
+              >
+                <span className="gecor-home-card__code">MN</span>
+                <span className="gecor-home-card__content">
+                  <span className="gecor-home-card__title">Manual de Utilização</span>
+                  <span className="gecor-home-card__desc">
+                    Guia rápido do Mobile e da Plataforma Web.
+                  </span>
+                </span>
+                <span className="gecor-home-card__arrow" aria-hidden="true">→</span>
+              </button>
             </div>
           </section>
 
