@@ -131,7 +131,7 @@ export default function Login() {
           </div>
 
           <p className="gecor-login-note">
-            Gestão segura das operações e dos registros produzidos pela atividade correcional.
+            Gestão segura das operações e dos registros produzidos pela atividade correicional.
           </p>
         </section>
 
