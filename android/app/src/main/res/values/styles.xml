@@ -1,0 +1,21 @@
+<resources>
+
+    <!-- Tema claro fixo do OPERSAI -->
+    <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
+
+        <!-- Impede o Android de aplicar modo escuro automaticamente -->
+        <item name="android:forceDarkAllowed">false</item>
+
+        <!-- Mantém o comportamento padrão dos campos de texto -->
+        <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+
+        <!-- Barra de status clara -->
+        <item name="android:statusBarColor">#FFFFFF</item>
+        <item name="android:windowLightStatusBar">true</item>
+
+        <!-- Fundo padrão -->
+        <item name="android:windowBackground">#FFFFFF</item>
+
+    </style>
+
+</resources>
