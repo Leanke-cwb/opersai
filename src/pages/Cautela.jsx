@@ -20,10 +20,25 @@ function textoPDF(valor, padrao = "-") {
   return texto.toLocaleUpperCase("pt-BR");
 }
 
+const MATERIAL_VAZIO = {
+  tipo_categoria: "",
+  item_nome: "",
+  quantidade: "",
+  numero_serie: "",
+  patrimonio: "",
+  descricao: "",
+  observacao: "",
+};
+
 export default function Cautela() {
   const navigate = useNavigate();
   const [dados, setDados] = useState(null);
   const [carregando, setCarregando] = useState(true);
+  const [salvandoMaterial, setSalvandoMaterial] = useState(false);
+  const [novoMaterial, setNovoMaterial] = useState(MATERIAL_VAZIO);
+  const [editandoId, setEditandoId] = useState(null);
+  const [materialEdicao, setMaterialEdicao] = useState(MATERIAL_VAZIO);
+
   const [form, setForm] = useState({
     sede: "",
     enderecoEntrega: "",
@@ -48,6 +63,7 @@ export default function Cautela() {
       try {
         const alvoId =
           localStorage.getItem("alvoId") || localStorage.getItem("alvo_id");
+
         if (!alvoId) {
           console.error("❌ Nenhum alvo selecionado.");
           setCarregando(false);
@@ -59,6 +75,7 @@ export default function Cautela() {
           .select("*")
           .eq("id", alvoId)
           .single();
+
         if (erroAlvo) throw erroAlvo;
 
         const { data: operacao, error: erroOp } = await supabase
@@ -66,37 +83,45 @@ export default function Cautela() {
           .select("*")
           .eq("id", alvo?.operacao_id)
           .single();
+
         if (erroOp) throw erroOp;
 
         const { data: cumprimento, error: erroCumpr } = await supabase
-  .from("cumprimento_mandado")
-  .select(
-    "comandante_nome, comandante_cpf, comandante_posto_graduacao, policiais_apoio"
-  )
-  .eq("alvo_id", alvo.id)
-  .maybeSingle();
+          .from("cumprimento_mandado")
+          .select(
+            "id, comandante_nome, comandante_cpf, comandante_posto_graduacao, policiais_apoio",
+          )
+          .eq("alvo_id", alvo.id)
+          .maybeSingle();
 
         if (erroCumpr) {
           console.warn("⚠️ Nenhum comandante encontrado para esta operação.");
         }
 
+        const { data: materiais, error: erroMateriais } = await supabase
+          .from("materiais_apreendidos")
+          .select("*")
+          .eq("alvo_id", alvo.id)
+          .order("created_at", { ascending: true });
+
+        if (erroMateriais) throw erroMateriais;
+
         const comandante = cumprimento?.comandante_nome || "-";
         const cpf_comandante = cumprimento?.comandante_cpf || "-";
-        const posto_graduacao = cumprimento?.comandante_posto_graduacao || "-";
-
-        const itensLocal = localStorage.getItem("itensApreendidos");
-        const materiais = itensLocal ? JSON.parse(itensLocal) : [];
+        const posto_graduacao =
+          cumprimento?.comandante_posto_graduacao || "-";
 
         setDados({
           alvo,
           operacao,
+          cumprimento_id: cumprimento?.id || null,
           comandante,
           cpf_comandante,
           posto_graduacao,
           policiais_apoio: Array.isArray(cumprimento?.policiais_apoio)
             ? cumprimento.policiais_apoio
             : [],
-          materiais,
+          materiais: materiais || [],
         });
       } catch (err) {
         console.error("❌ Erro ao carregar dados:", err.message);
@@ -107,6 +132,183 @@ export default function Cautela() {
 
     buscarDados();
   }, []);
+
+  const atualizarCampoNovoMaterial = (campo, valor) => {
+    setNovoMaterial((anterior) => ({
+      ...anterior,
+      [campo]: valor,
+    }));
+  };
+
+  const atualizarCampoEdicao = (campo, valor) => {
+    setMaterialEdicao((anterior) => ({
+      ...anterior,
+      [campo]: valor,
+    }));
+  };
+
+  const adicionarMaterial = async () => {
+    if (!dados?.alvo?.id) {
+      alert("Alvo não identificado.");
+      return;
+    }
+
+    if (!novoMaterial.tipo_categoria.trim()) {
+      alert("Informe a categoria do material.");
+      return;
+    }
+
+    if (!novoMaterial.item_nome.trim()) {
+      alert("Informe o nome/grupo do material.");
+      return;
+    }
+
+    try {
+      setSalvandoMaterial(true);
+
+      const primeiroMaterial = dados?.materiais?.[0] || null;
+
+      const materialParaInserir = {
+        cumprimento_id:
+          dados?.cumprimento_id || primeiroMaterial?.cumprimento_id || null,
+        alvo_id: dados.alvo.id,
+        auto_id: primeiroMaterial?.auto_id || null,
+        tipo_categoria: novoMaterial.tipo_categoria.trim(),
+        item_nome: novoMaterial.item_nome.trim(),
+        quantidade: novoMaterial.quantidade.trim() || null,
+        numero_serie: novoMaterial.numero_serie.trim() || null,
+        patrimonio: novoMaterial.patrimonio.trim() || null,
+        descricao: novoMaterial.descricao.trim() || null,
+        observacao: novoMaterial.observacao.trim() || null,
+      };
+
+      const { data: materialCriado, error } = await supabase
+        .from("materiais_apreendidos")
+        .insert(materialParaInserir)
+        .select("*")
+        .single();
+
+      if (error) throw error;
+
+      setDados((anterior) => ({
+        ...anterior,
+        materiais: [...(anterior?.materiais || []), materialCriado],
+      }));
+
+      setNovoMaterial(MATERIAL_VAZIO);
+      alert("Material adicionado com sucesso.");
+    } catch (err) {
+      console.error("❌ Erro ao adicionar material:", err);
+      alert(`Erro ao adicionar material: ${err.message}`);
+    } finally {
+      setSalvandoMaterial(false);
+    }
+  };
+
+  const iniciarEdicao = (item) => {
+    setEditandoId(item.id);
+    setMaterialEdicao({
+      tipo_categoria: item.tipo_categoria || "",
+      item_nome: item.item_nome || "",
+      quantidade: item.quantidade || "",
+      numero_serie: item.numero_serie || "",
+      patrimonio: item.patrimonio || "",
+      descricao: item.descricao || "",
+      observacao: item.observacao || "",
+    });
+  };
+
+  const cancelarEdicao = () => {
+    setEditandoId(null);
+    setMaterialEdicao(MATERIAL_VAZIO);
+  };
+
+  const salvarEdicao = async (itemId) => {
+    if (!materialEdicao.tipo_categoria.trim()) {
+      alert("Informe a categoria do material.");
+      return;
+    }
+
+    if (!materialEdicao.item_nome.trim()) {
+      alert("Informe o nome/grupo do material.");
+      return;
+    }
+
+    try {
+      setSalvandoMaterial(true);
+
+      const atualizacao = {
+        tipo_categoria: materialEdicao.tipo_categoria.trim(),
+        item_nome: materialEdicao.item_nome.trim(),
+        quantidade: materialEdicao.quantidade.trim() || null,
+        numero_serie: materialEdicao.numero_serie.trim() || null,
+        patrimonio: materialEdicao.patrimonio.trim() || null,
+        descricao: materialEdicao.descricao.trim() || null,
+        observacao: materialEdicao.observacao.trim() || null,
+      };
+
+      const { data: materialAtualizado, error } = await supabase
+        .from("materiais_apreendidos")
+        .update(atualizacao)
+        .eq("id", itemId)
+        .select("*")
+        .single();
+
+      if (error) throw error;
+
+      setDados((anterior) => ({
+        ...anterior,
+        materiais: (anterior?.materiais || []).map((item) =>
+          item.id === itemId ? materialAtualizado : item,
+        ),
+      }));
+
+      cancelarEdicao();
+      alert("Material atualizado com sucesso.");
+    } catch (err) {
+      console.error("❌ Erro ao atualizar material:", err);
+      alert(`Erro ao atualizar material: ${err.message}`);
+    } finally {
+      setSalvandoMaterial(false);
+    }
+  };
+
+  const excluirMaterial = async (item) => {
+    const confirmar = window.confirm(
+      `Deseja realmente excluir o material "${item.item_nome}"?`,
+    );
+
+    if (!confirmar) return;
+
+    try {
+      setSalvandoMaterial(true);
+
+      const { error } = await supabase
+        .from("materiais_apreendidos")
+        .delete()
+        .eq("id", item.id);
+
+      if (error) throw error;
+
+      setDados((anterior) => ({
+        ...anterior,
+        materiais: (anterior?.materiais || []).filter(
+          (material) => material.id !== item.id,
+        ),
+      }));
+
+      if (editandoId === item.id) {
+        cancelarEdicao();
+      }
+
+      alert("Material excluído com sucesso.");
+    } catch (err) {
+      console.error("❌ Erro ao excluir material:", err);
+      alert(`Erro ao excluir material: ${err.message}`);
+    } finally {
+      setSalvandoMaterial(false);
+    }
+  };
 
   const formatarDataPorExtenso = () => {
     const data = new Date();
@@ -296,7 +498,7 @@ export default function Cautela() {
   }
 
   return (
-    <div className="gecor-work-panel max-w-3xl mx-auto p-6 bg-white shadow rounded mt-10">
+    <div className="gecor-work-panel max-w-5xl mx-auto p-6 bg-white shadow rounded mt-10">
       <div className="flex justify-between items-center mb-4">
         <button
           onClick={() => navigate(-1)}
@@ -327,7 +529,6 @@ export default function Cautela() {
         entregues na sede do(a):
       </p>
 
-      {/* 🔹 CAMPOS DE DESTINO E RECEBEDOR */}
       <div className="mb-6 space-y-3">
         <label className="block">
           <span className="font-semibold">Sede:</span>
@@ -405,41 +606,291 @@ export default function Cautela() {
         </label>
       </div>
 
-      <h3 className="font-semibold mb-2">Materiais Apreendidos:</h3>
-      <table className="w-full border mb-6 text-sm">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="border p-2">Item nº</th>
-            <th className="border p-2">Quantidade</th>
-            <th className="border p-2">Grupo</th>
-            <th className="border p-2">Descrição</th>
-            <th className="border p-2">Nº Série</th>
-            <th className="border p-2">Patrimônio</th>
-            <th className="border p-2">Observação</th>
-          </tr>
-        </thead>
-        <tbody>
-          {dados?.materiais?.length > 0 ? (
-            dados.materiais.map((item, index) => (
-              <tr key={index}>
-                <td className="border p-2 text-center">{index + 1}</td>
-                <td className="border p-2 text-center">{item.quantidade}</td>
-                <td className="border p-2">{item.item_nome}</td>
-                <td className="border p-2">{item.descricao}</td>
-                <td className="border p-2">{item.numero_serie}</td>
-                <td className="border p-2">{item.patrimonio}</td>
-                <td className="border p-2">{item.observacao}</td>
+      <div className="mb-8">
+        <h3 className="font-semibold mb-2">Materiais Apreendidos:</h3>
+
+        <div className="overflow-x-auto">
+          <table className="w-full border mb-4 text-sm">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="border p-2">Item nº</th>
+                <th className="border p-2">Categoria</th>
+                <th className="border p-2">Quantidade</th>
+                <th className="border p-2">Grupo</th>
+                <th className="border p-2">Descrição</th>
+                <th className="border p-2">Nº Série</th>
+                <th className="border p-2">Patrimônio</th>
+                <th className="border p-2">Observação</th>
+                <th className="border p-2">Ações</th>
               </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan="7" className="text-center border p-2">
-                Nenhum material cadastrado.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+            </thead>
+            <tbody>
+              {dados?.materiais?.length > 0 ? (
+                dados.materiais.map((item, index) => (
+                  <React.Fragment key={item.id}>
+                    <tr>
+                      <td className="border p-2 text-center">{index + 1}</td>
+                      <td className="border p-2">{item.tipo_categoria || "-"}</td>
+                      <td className="border p-2 text-center">
+                        {item.quantidade || "-"}
+                      </td>
+                      <td className="border p-2">{item.item_nome || "-"}</td>
+                      <td className="border p-2">{item.descricao || "-"}</td>
+                      <td className="border p-2">{item.numero_serie || "-"}</td>
+                      <td className="border p-2">{item.patrimonio || "-"}</td>
+                      <td className="border p-2">{item.observacao || "-"}</td>
+                      <td className="border p-2">
+                        <div className="flex flex-col gap-2 min-w-24">
+                          <button
+                            type="button"
+                            onClick={() => iniciarEdicao(item)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded"
+                            disabled={salvandoMaterial}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => excluirMaterial(item)}
+                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded"
+                            disabled={salvandoMaterial}
+                          >
+                            Excluir
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {editandoId === item.id && (
+                      <tr>
+                        <td colSpan="9" className="border p-4 bg-blue-50">
+                          <h4 className="font-semibold mb-3">
+                            Editar material nº {index + 1}
+                          </h4>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <label>
+                              <span className="font-semibold">Categoria *</span>
+                              <input
+                                type="text"
+                                className="border p-2 rounded w-full"
+                                value={materialEdicao.tipo_categoria}
+                                onChange={(e) =>
+                                  atualizarCampoEdicao(
+                                    "tipo_categoria",
+                                    e.target.value,
+                                  )
+                                }
+                              />
+                            </label>
+
+                            <label>
+                              <span className="font-semibold">Grupo / Item *</span>
+                              <input
+                                type="text"
+                                className="border p-2 rounded w-full"
+                                value={materialEdicao.item_nome}
+                                onChange={(e) =>
+                                  atualizarCampoEdicao("item_nome", e.target.value)
+                                }
+                              />
+                            </label>
+
+                            <label>
+                              <span className="font-semibold">Quantidade</span>
+                              <input
+                                type="text"
+                                className="border p-2 rounded w-full"
+                                value={materialEdicao.quantidade}
+                                onChange={(e) =>
+                                  atualizarCampoEdicao("quantidade", e.target.value)
+                                }
+                              />
+                            </label>
+
+                            <label>
+                              <span className="font-semibold">Nº Série</span>
+                              <input
+                                type="text"
+                                className="border p-2 rounded w-full"
+                                value={materialEdicao.numero_serie}
+                                onChange={(e) =>
+                                  atualizarCampoEdicao("numero_serie", e.target.value)
+                                }
+                              />
+                            </label>
+
+                            <label>
+                              <span className="font-semibold">Patrimônio</span>
+                              <input
+                                type="text"
+                                className="border p-2 rounded w-full"
+                                value={materialEdicao.patrimonio}
+                                onChange={(e) =>
+                                  atualizarCampoEdicao("patrimonio", e.target.value)
+                                }
+                              />
+                            </label>
+
+                            <label>
+                              <span className="font-semibold">Descrição</span>
+                              <input
+                                type="text"
+                                className="border p-2 rounded w-full"
+                                value={materialEdicao.descricao}
+                                onChange={(e) =>
+                                  atualizarCampoEdicao("descricao", e.target.value)
+                                }
+                              />
+                            </label>
+
+                            <label className="md:col-span-2">
+                              <span className="font-semibold">Observação</span>
+                              <textarea
+                                className="border p-2 rounded w-full"
+                                rows={3}
+                                value={materialEdicao.observacao}
+                                onChange={(e) =>
+                                  atualizarCampoEdicao("observacao", e.target.value)
+                                }
+                              />
+                            </label>
+                          </div>
+
+                          <div className="flex gap-2 mt-4">
+                            <button
+                              type="button"
+                              onClick={() => salvarEdicao(item.id)}
+                              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+                              disabled={salvandoMaterial}
+                            >
+                              {salvandoMaterial ? "Salvando..." : "Salvar Alterações"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={cancelarEdicao}
+                              className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
+                              disabled={salvandoMaterial}
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="9" className="text-center border p-3">
+                    Nenhum material cadastrado.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="border rounded p-4 bg-gray-50">
+          <h4 className="font-semibold mb-3">Adicionar novo material</h4>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <label>
+              <span className="font-semibold">Categoria *</span>
+              <input
+                type="text"
+                className="border p-2 rounded w-full"
+                value={novoMaterial.tipo_categoria}
+                onChange={(e) =>
+                  atualizarCampoNovoMaterial("tipo_categoria", e.target.value)
+                }
+              />
+            </label>
+
+            <label>
+              <span className="font-semibold">Grupo / Item *</span>
+              <input
+                type="text"
+                className="border p-2 rounded w-full"
+                value={novoMaterial.item_nome}
+                onChange={(e) =>
+                  atualizarCampoNovoMaterial("item_nome", e.target.value)
+                }
+              />
+            </label>
+
+            <label>
+              <span className="font-semibold">Quantidade</span>
+              <input
+                type="text"
+                className="border p-2 rounded w-full"
+                value={novoMaterial.quantidade}
+                onChange={(e) =>
+                  atualizarCampoNovoMaterial("quantidade", e.target.value)
+                }
+              />
+            </label>
+
+            <label>
+              <span className="font-semibold">Nº Série</span>
+              <input
+                type="text"
+                className="border p-2 rounded w-full"
+                value={novoMaterial.numero_serie}
+                onChange={(e) =>
+                  atualizarCampoNovoMaterial("numero_serie", e.target.value)
+                }
+              />
+            </label>
+
+            <label>
+              <span className="font-semibold">Patrimônio</span>
+              <input
+                type="text"
+                className="border p-2 rounded w-full"
+                value={novoMaterial.patrimonio}
+                onChange={(e) =>
+                  atualizarCampoNovoMaterial("patrimonio", e.target.value)
+                }
+              />
+            </label>
+
+            <label>
+              <span className="font-semibold">Descrição</span>
+              <input
+                type="text"
+                className="border p-2 rounded w-full"
+                value={novoMaterial.descricao}
+                onChange={(e) =>
+                  atualizarCampoNovoMaterial("descricao", e.target.value)
+                }
+              />
+            </label>
+
+            <label className="md:col-span-2">
+              <span className="font-semibold">Observação</span>
+              <textarea
+                className="border p-2 rounded w-full"
+                rows={3}
+                value={novoMaterial.observacao}
+                onChange={(e) =>
+                  atualizarCampoNovoMaterial("observacao", e.target.value)
+                }
+              />
+            </label>
+          </div>
+
+          <button
+            type="button"
+            onClick={adicionarMaterial}
+            className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+            disabled={salvandoMaterial}
+          >
+            {salvandoMaterial ? "Salvando..." : "+ Adicionar Material"}
+          </button>
+        </div>
+      </div>
 
       {dados?.policiais_apoio?.length > 0 && (
         <>
