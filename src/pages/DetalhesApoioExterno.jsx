@@ -124,6 +124,22 @@ function Secao({ titulo, children }) {
   );
 }
 
+const ITEM_VAZIO = {
+  numero_item: "",
+  tipo_categoria: "",
+  item_nome: "",
+  quantidade: "",
+  numero_serie: "",
+  patrimonio: "",
+  descricao: "",
+  observacao: "",
+};
+
+function textoOuNull(valor) {
+  const texto = String(valor ?? "").trim();
+  return texto === "" ? null : texto;
+}
+
 export default function DetalhesApoioExterno() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -133,6 +149,13 @@ export default function DetalhesApoioExterno() {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [excluindo, setExcluindo] = useState(false);
+
+  // Edição dos materiais do apoio
+  const [itemEditandoId, setItemEditandoId] = useState(null);
+  const [mostrarFormularioItem, setMostrarFormularioItem] = useState(false);
+  const [salvandoItem, setSalvandoItem] = useState(false);
+  const [excluindoItemId, setExcluindoItemId] = useState(null);
+  const [formItem, setFormItem] = useState(ITEM_VAZIO);
 
   useEffect(() => {
     carregarDetalhes();
@@ -183,6 +206,160 @@ export default function DetalhesApoioExterno() {
       setItens([]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  function cancelarEdicaoItem() {
+    setItemEditandoId(null);
+    setMostrarFormularioItem(false);
+    setFormItem(ITEM_VAZIO);
+  }
+
+  function abrirNovoItem() {
+    const maiorNumero = itens.reduce((maior, item) => {
+      const numero = Number(item?.numero_item);
+      return Number.isFinite(numero) ? Math.max(maior, numero) : maior;
+    }, 0);
+
+    setItemEditandoId(null);
+    setFormItem({
+      ...ITEM_VAZIO,
+      numero_item: String(maiorNumero + 1),
+      quantidade: "1",
+    });
+    setMostrarFormularioItem(true);
+  }
+
+  function abrirEdicaoItem(item) {
+    setItemEditandoId(item.id);
+    setFormItem({
+      numero_item: item.numero_item ?? "",
+      tipo_categoria: item.tipo_categoria ?? "",
+      item_nome: item.item_nome ?? "",
+      quantidade: item.quantidade ?? "",
+      numero_serie: item.numero_serie ?? "",
+      patrimonio: item.patrimonio ?? "",
+      descricao: item.descricao ?? "",
+      observacao: item.observacao ?? "",
+    });
+    setMostrarFormularioItem(true);
+  }
+
+  function atualizarCampoItem(campo, valor) {
+    setFormItem((anterior) => ({
+      ...anterior,
+      [campo]: valor,
+    }));
+  }
+
+  async function salvarItem(event) {
+    event.preventDefault();
+    if (salvandoItem) return;
+
+    const numeroItem =
+      String(formItem.numero_item ?? "").trim() === ""
+        ? null
+        : Number(formItem.numero_item);
+
+    if (numeroItem !== null && (!Number.isInteger(numeroItem) || numeroItem < 1)) {
+      alert("Informe um número de item válido.");
+      return;
+    }
+
+    const agora = new Date().toISOString();
+    const dadosItem = {
+      numero_item: numeroItem,
+      tipo_categoria: textoOuNull(formItem.tipo_categoria),
+      item_nome: textoOuNull(formItem.item_nome),
+      quantidade: textoOuNull(formItem.quantidade),
+      numero_serie: textoOuNull(formItem.numero_serie),
+      patrimonio: textoOuNull(formItem.patrimonio),
+      descricao: textoOuNull(formItem.descricao),
+      observacao: textoOuNull(formItem.observacao),
+      updated_at: agora,
+    };
+
+    try {
+      setSalvandoItem(true);
+
+      if (itemEditandoId) {
+        const { error } = await supabase
+          .from("apoio_itens")
+          .update(dadosItem)
+          .eq("id", itemEditandoId)
+          .eq("apoio_id", id)
+          .eq("deleted", false);
+
+        if (error) throw error;
+        alert("Material atualizado com sucesso.");
+      } else {
+        if (!window.crypto?.randomUUID) {
+          throw new Error(
+            "Este navegador não conseguiu gerar o identificador do novo material.",
+          );
+        }
+
+        const { error } = await supabase.from("apoio_itens").insert({
+          id: window.crypto.randomUUID(),
+          apoio_id: id,
+          ...dadosItem,
+          created_at: agora,
+          deleted: false,
+        });
+
+        if (error) throw error;
+        alert("Material adicionado com sucesso.");
+      }
+
+      cancelarEdicaoItem();
+      await carregarDetalhes();
+    } catch (error) {
+      console.error("Erro ao salvar material do apoio:", error);
+      alert(error?.message || "Não foi possível salvar o material.");
+    } finally {
+      setSalvandoItem(false);
+    }
+  }
+
+  async function excluirItem(item) {
+    if (!item?.id || excluindoItemId) return;
+
+    const confirmado = window.confirm(
+      `Confirma a exclusão do item ${item.numero_item ?? ""} - ${
+        item.item_nome || "material"
+      }?`,
+    );
+
+    if (!confirmado) return;
+
+    try {
+      setExcluindoItemId(item.id);
+
+      // Exclusão lógica: o histórico permanece no banco, mas o item deixa de
+      // aparecer nesta tela porque a consulta usa deleted = false.
+      const { error } = await supabase
+        .from("apoio_itens")
+        .update({
+          deleted: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", item.id)
+        .eq("apoio_id", id)
+        .eq("deleted", false);
+
+      if (error) throw error;
+
+      if (itemEditandoId === item.id) {
+        cancelarEdicaoItem();
+      }
+
+      alert("Material excluído com sucesso.");
+      await carregarDetalhes();
+    } catch (error) {
+      console.error("Erro ao excluir material do apoio:", error);
+      alert(error?.message || "Não foi possível excluir o material.");
+    } finally {
+      setExcluindoItemId(null);
     }
   }
 
@@ -520,11 +697,141 @@ export default function DetalhesApoioExterno() {
           </Secao>
 
           <Secao titulo="Materiais Apreendidos">
+            <div className="flex flex-wrap justify-end gap-2 mb-4">
+              <button
+                type="button"
+                onClick={abrirNovoItem}
+                disabled={salvandoItem}
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-4 py-2 rounded"
+              >
+                + Adicionar Material
+              </button>
+            </div>
+
+            {mostrarFormularioItem && (
+              <form
+                onSubmit={salvarItem}
+                className="mb-5 border border-blue-200 bg-blue-50 rounded-lg p-4"
+              >
+                <h3 className="font-bold text-gray-800 mb-4">
+                  {itemEditandoId ? "Editar material" : "Adicionar material"}
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <label className="block">
+                    <span className="text-sm font-semibold text-gray-700">Item nº</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={formItem.numero_item}
+                      onChange={(e) => atualizarCampoItem("numero_item", e.target.value)}
+                      className="mt-1 border rounded px-3 py-2 w-full bg-white"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-semibold text-gray-700">Categoria</span>
+                    <input
+                      type="text"
+                      value={formItem.tipo_categoria}
+                      onChange={(e) =>
+                        atualizarCampoItem("tipo_categoria", e.target.value)
+                      }
+                      className="mt-1 border rounded px-3 py-2 w-full bg-white"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-semibold text-gray-700">Material</span>
+                    <input
+                      type="text"
+                      value={formItem.item_nome}
+                      onChange={(e) => atualizarCampoItem("item_nome", e.target.value)}
+                      className="mt-1 border rounded px-3 py-2 w-full bg-white"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-semibold text-gray-700">Quantidade</span>
+                    <input
+                      type="text"
+                      value={formItem.quantidade}
+                      onChange={(e) => atualizarCampoItem("quantidade", e.target.value)}
+                      className="mt-1 border rounded px-3 py-2 w-full bg-white"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-semibold text-gray-700">Nº Série</span>
+                    <input
+                      type="text"
+                      value={formItem.numero_serie}
+                      onChange={(e) => atualizarCampoItem("numero_serie", e.target.value)}
+                      className="mt-1 border rounded px-3 py-2 w-full bg-white"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-semibold text-gray-700">Patrimônio</span>
+                    <input
+                      type="text"
+                      value={formItem.patrimonio}
+                      onChange={(e) => atualizarCampoItem("patrimonio", e.target.value)}
+                      className="mt-1 border rounded px-3 py-2 w-full bg-white"
+                    />
+                  </label>
+
+                  <label className="block md:col-span-3">
+                    <span className="text-sm font-semibold text-gray-700">Descrição</span>
+                    <textarea
+                      rows="3"
+                      value={formItem.descricao}
+                      onChange={(e) => atualizarCampoItem("descricao", e.target.value)}
+                      className="mt-1 border rounded px-3 py-2 w-full bg-white"
+                    />
+                  </label>
+
+                  <label className="block md:col-span-3">
+                    <span className="text-sm font-semibold text-gray-700">Observação</span>
+                    <textarea
+                      rows="3"
+                      value={formItem.observacao}
+                      onChange={(e) => atualizarCampoItem("observacao", e.target.value)}
+                      className="mt-1 border rounded px-3 py-2 w-full bg-white"
+                    />
+                  </label>
+                </div>
+
+                <div className="flex flex-wrap gap-2 mt-4">
+                  <button
+                    type="submit"
+                    disabled={salvandoItem}
+                    className="bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white px-4 py-2 rounded"
+                  >
+                    {salvandoItem
+                      ? "Salvando..."
+                      : itemEditandoId
+                        ? "Salvar Alterações"
+                        : "Adicionar Material"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelarEdicaoItem}
+                    disabled={salvandoItem}
+                    className="bg-gray-500 hover:bg-gray-600 disabled:opacity-60 text-white px-4 py-2 rounded"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            )}
+
             {itens.length === 0 ? (
               <p className="text-gray-500">Nenhum material registrado.</p>
             ) : (
               <div className="overflow-x-auto border rounded">
-                <table className="w-full border-collapse min-w-[850px]">
+                <table className="w-full border-collapse min-w-[1000px]">
                   <thead>
                     <tr className="bg-gray-50 text-left">
                       <th className="border-b px-3 py-2">Item</th>
@@ -534,11 +841,12 @@ export default function DetalhesApoioExterno() {
                       <th className="border-b px-3 py-2">Patrimônio</th>
                       <th className="border-b px-3 py-2">Descrição</th>
                       <th className="border-b px-3 py-2">Observação</th>
+                      <th className="border-b px-3 py-2 text-center">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
                     {itens.map((item, index) => (
-                      <tr key={item.id}>
+                      <tr key={item.id} className="align-top">
                         <td className="border-b px-3 py-2">
                           {item.numero_item ?? index + 1}
                         </td>
@@ -556,6 +864,26 @@ export default function DetalhesApoioExterno() {
                         </td>
                         <td className="border-b px-3 py-2 whitespace-pre-wrap">
                           {item.observacao || "-"}
+                        </td>
+                        <td className="border-b px-3 py-2">
+                          <div className="flex flex-col gap-2 min-w-[105px]">
+                            <button
+                              type="button"
+                              onClick={() => abrirEdicaoItem(item)}
+                              disabled={salvandoItem || excluindoItemId === item.id}
+                              className="bg-yellow-500 hover:bg-yellow-600 disabled:opacity-60 text-white px-3 py-1.5 rounded text-sm"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => excluirItem(item)}
+                              disabled={salvandoItem || excluindoItemId === item.id}
+                              className="bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white px-3 py-1.5 rounded text-sm"
+                            >
+                              {excluindoItemId === item.id ? "Excluindo..." : "Excluir"}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
