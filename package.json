@@ -22,6 +22,9 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@react-native-community/cli": "19.0.0",
+    "@react-native-community/cli-platform-android": "19.0.0",
+    "@react-native/gradle-plugin": "^0.80.0",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.6",
