@@ -183,6 +183,17 @@ export default function Login() {
               />
             </div>
 
+            <div className="gecor-login-register" style={{ marginTop: "-4px", marginBottom: "14px" }}>
+              <button
+                type="button"
+                onClick={() => navigate("/recuperar-senha")}
+                className="gecor-text-button"
+                disabled={entrando}
+              >
+                Esqueci minha senha
+              </button>
+            </div>
+
             <button
               type="submit"
               className="gecor-primary-button"
