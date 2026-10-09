@@ -149,6 +149,18 @@ export default function DetalhesApoioExterno() {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [excluindo, setExcluindo] = useState(false);
+  const [editandoEntrega, setEditandoEntrega] = useState(false);
+  const [salvandoEntrega, setSalvandoEntrega] = useState(false);
+  const [formEntrega, setFormEntrega] = useState({
+    entrega_orgao: "",
+    entrega_unidade: "",
+    responsavel_nome: "",
+    responsavel_funcao: "",
+    responsavel_documento: "",
+    entrega_data: "",
+    entrega_hora: "",
+    observacoes_entrega: "",
+  });
 
   // Edição dos materiais do apoio
   const [itemEditandoId, setItemEditandoId] = useState(null);
@@ -198,6 +210,7 @@ export default function DetalhesApoioExterno() {
       }
 
       setApoio(apoioData);
+      setFormEntrega(criarFormularioEntrega(apoioData));
       setItens(Array.isArray(itensData) ? itensData : []);
     } catch (error) {
       console.error("Erro ao carregar detalhes do apoio:", error);
@@ -206,6 +219,71 @@ export default function DetalhesApoioExterno() {
       setItens([]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  function criarFormularioEntrega(dados) {
+    return {
+      entrega_orgao: dados?.entrega_orgao ?? "",
+      entrega_unidade: dados?.entrega_unidade ?? "",
+      responsavel_nome: dados?.responsavel_nome ?? "",
+      responsavel_funcao: dados?.responsavel_funcao ?? "",
+      responsavel_documento: dados?.responsavel_documento ?? "",
+      entrega_data: dados?.entrega_data ?? "",
+      entrega_hora: String(dados?.entrega_hora ?? "").slice(0, 5),
+      observacoes_entrega: dados?.observacoes_entrega ?? "",
+    };
+  }
+
+  function atualizarCampoEntrega(campo, valor) {
+    setFormEntrega((anterior) => ({ ...anterior, [campo]: valor }));
+  }
+
+  function cancelarEdicaoEntrega() {
+    setFormEntrega(criarFormularioEntrega(apoio));
+    setEditandoEntrega(false);
+  }
+
+  async function salvarEntrega(event) {
+    event.preventDefault();
+    if (salvandoEntrega) return;
+
+    if (!formEntrega.responsavel_nome.trim()) {
+      alert("Informe o nome do responsável pelo recebimento.");
+      return;
+    }
+
+    const dadosEntrega = {
+      entrega_orgao: textoOuNull(formEntrega.entrega_orgao),
+      entrega_unidade: textoOuNull(formEntrega.entrega_unidade),
+      responsavel_nome: formEntrega.responsavel_nome.trim(),
+      responsavel_funcao: textoOuNull(formEntrega.responsavel_funcao),
+      responsavel_documento: textoOuNull(formEntrega.responsavel_documento),
+      entrega_data: formEntrega.entrega_data || null,
+      entrega_hora: formEntrega.entrega_hora || null,
+      observacoes_entrega: textoOuNull(formEntrega.observacoes_entrega),
+      updated_at: new Date().toISOString(),
+    };
+
+    try {
+      setSalvandoEntrega(true);
+      const { data, error } = await supabase
+        .from("apoios_externos")
+        .update(dadosEntrega)
+        .eq("id", id)
+        .select("id, entrega_orgao, entrega_unidade, responsavel_nome, responsavel_funcao, responsavel_documento, entrega_data, entrega_hora, observacoes_entrega, updated_at")
+        .single();
+
+      if (error) throw error;
+      setApoio((anterior) => ({ ...anterior, ...data }));
+      setFormEntrega(criarFormularioEntrega(data));
+      setEditandoEntrega(false);
+      alert("Dados da entrega atualizados com sucesso.");
+    } catch (error) {
+      console.error("Erro ao atualizar dados da entrega:", error);
+      alert(`Não foi possível atualizar a entrega: ${error?.message || "erro desconhecido"}`);
+    } finally {
+      setSalvandoEntrega(false);
     }
   }
 
@@ -894,20 +972,106 @@ export default function DetalhesApoioExterno() {
           </Secao>
 
           <Secao titulo="Entrega dos Materiais">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <Campo titulo="Órgão recebedor" valor={apoio.entrega_orgao} />
-              <Campo titulo="Unidade recebedora" valor={apoio.entrega_unidade} />
-              <Campo titulo="Responsável pelo recebimento" valor={apoio.responsavel_nome} />
-              <Campo titulo="Função/Cargo" valor={apoio.responsavel_funcao} />
-              <Campo titulo="CPF" valor={formatarCPF(apoio.responsavel_documento)} />
-              <Campo
-                titulo="Data e hora da entrega"
-                valor={formatarDataHora(apoio.entrega_data, apoio.entrega_hora)}
-              />
-              <div className="md:col-span-2">
-                <Campo titulo="Observações da entrega" valor={apoio.observacoes_entrega} />
-              </div>
-            </div>
+            {!editandoEntrega ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <Campo titulo="Órgão recebedor" valor={apoio.entrega_orgao} />
+                  <Campo titulo="Unidade recebedora" valor={apoio.entrega_unidade} />
+                  <Campo titulo="Responsável pelo recebimento" valor={apoio.responsavel_nome} />
+                  <Campo titulo="Função/Cargo" valor={apoio.responsavel_funcao} />
+                  <Campo titulo="CPF" valor={formatarCPF(apoio.responsavel_documento)} />
+                  <Campo
+                    titulo="Data e hora da entrega"
+                    valor={formatarDataHora(apoio.entrega_data, apoio.entrega_hora)}
+                  />
+                  <div className="md:col-span-2">
+                    <Campo titulo="Observações da entrega" valor={apoio.observacoes_entrega} />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormEntrega(criarFormularioEntrega(apoio));
+                    setEditandoEntrega(true);
+                  }}
+                  className="mt-4 border rounded px-4 py-2 text-sm font-semibold hover:bg-gray-50"
+                >
+                  Editar entrega
+                </button>
+              </>
+            ) : (
+              <form onSubmit={salvarEntrega} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[
+                    ["entrega_orgao", "Órgão recebedor"],
+                    ["entrega_unidade", "Unidade recebedora"],
+                    ["responsavel_nome", "Responsável pelo recebimento"],
+                    ["responsavel_funcao", "Função/Cargo"],
+                    ["responsavel_documento", "CPF"],
+                  ].map(([campo, titulo]) => (
+                    <label key={campo} className="block">
+                      <span className="block text-sm font-semibold text-gray-700 mb-1">{titulo}</span>
+                      <input
+                        type="text"
+                        maxLength={200}
+                        required={campo === "responsavel_nome"}
+                        value={formEntrega[campo]}
+                        onChange={(e) => atualizarCampoEntrega(campo, e.target.value)}
+                        disabled={salvandoEntrega}
+                        className="w-full border rounded px-3 py-2 bg-white"
+                      />
+                    </label>
+                  ))}
+                  <label className="block">
+                    <span className="block text-sm font-semibold text-gray-700 mb-1">Data da entrega</span>
+                    <input
+                      type="date"
+                      value={formEntrega.entrega_data}
+                      onChange={(e) => atualizarCampoEntrega("entrega_data", e.target.value)}
+                      disabled={salvandoEntrega}
+                      className="w-full border rounded px-3 py-2 bg-white"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="block text-sm font-semibold text-gray-700 mb-1">Hora da entrega</span>
+                    <input
+                      type="time"
+                      value={formEntrega.entrega_hora}
+                      onChange={(e) => atualizarCampoEntrega("entrega_hora", e.target.value)}
+                      disabled={salvandoEntrega}
+                      className="w-full border rounded px-3 py-2 bg-white"
+                    />
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className="block text-sm font-semibold text-gray-700 mb-1">Observações da entrega</span>
+                    <textarea
+                      rows={3}
+                      value={formEntrega.observacoes_entrega}
+                      onChange={(e) => atualizarCampoEntrega("observacoes_entrega", e.target.value)}
+                      disabled={salvandoEntrega}
+                      className="w-full border rounded px-3 py-2 bg-white"
+                    />
+                  </label>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="submit"
+                    disabled={salvandoEntrega}
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded disabled:opacity-60"
+                  >
+                    {salvandoEntrega ? "Salvando..." : "Salvar alterações"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelarEdicaoEntrega}
+                    disabled={salvandoEntrega}
+                    className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded disabled:opacity-60"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            )}
           </Secao>
         </div>
       </div>
