@@ -153,53 +153,81 @@ export default function ConsultaAlvos() {
     );
   }
 
-  // Gera o PDF
+  // Gera uma página A4 independente para cada alvo selecionado.
   async function gerarPDF() {
     if (alvosSelecionados.length === 0) {
       alert("Selecione ao menos um alvo para gerar o PDF.");
       return;
     }
 
-    const input = document.getElementById("pdf-content");
-    if (!input) {
-      alert("Erro ao encontrar conteúdo para gerar PDF.");
+    const paginas = Array.from(
+      pdfContentRef.current?.querySelectorAll("[data-ficha-alvo]") || []
+    );
+    if (paginas.length === 0) {
+      alert("Erro ao encontrar as fichas para gerar o PDF.");
       return;
     }
 
-    await waitForImagesToLoad(input);
+    try {
+      const pdf = new jsPDF("p", "mm", "a4");
+      const larguraPagina = pdf.internal.pageSize.getWidth();
+      const alturaPagina = pdf.internal.pageSize.getHeight();
+      const margemRodape = 12;
 
-    const canvas = await html2canvas(input, { scale: 2, useCORS: true });
-    const imgData = canvas.toDataURL("image/png");
+      for (let indice = 0; indice < paginas.length; indice += 1) {
+        const pagina = paginas[indice];
+        await waitForImagesToLoad(pagina);
+        // Aguarda fontes e layout final antes de capturar.
+        if (document.fonts?.ready) await document.fonts.ready;
 
-    const pdf = new jsPDF("p", "mm", "a4");
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+        const canvas = await html2canvas(pagina, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          windowWidth: Math.max(document.documentElement.clientWidth, pagina.scrollWidth),
+        });
 
-    let alturaRestante = imgHeight;
-    let posicao = 0;
+        if (!canvas.width || !canvas.height) {
+          throw new Error(`Não foi possível capturar a ficha ${indice + 1}.`);
+        }
 
-    pdf.addImage(imgData, "PNG", 0, posicao, pdfWidth, imgHeight);
-    alturaRestante -= pageHeight;
+        // Ajusta a ficha inteira à página sem fragmentar a imagem.
+        const alturaProporcional = (canvas.height * larguraPagina) / canvas.width;
+        const alturaDisponivel = alturaPagina - margemRodape;
+        const fator = Math.min(1, alturaDisponivel / alturaProporcional);
+        const larguraImagem = larguraPagina * fator;
+        const alturaImagem = alturaProporcional * fator;
+        const posicaoX = (larguraPagina - larguraImagem) / 2;
 
-    while (alturaRestante > 0) {
-      posicao = alturaRestante - imgHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, "PNG", 0, posicao, pdfWidth, imgHeight);
-      alturaRestante -= pageHeight;
+        if (indice > 0) pdf.addPage();
+        pdf.addImage(
+          canvas.toDataURL("image/jpeg", 0.92),
+          "JPEG",
+          posicaoX,
+          0,
+          larguraImagem,
+          alturaImagem
+        );
+      }
+
+      const totalPaginas = pdf.internal.getNumberOfPages();
+      for (let pagina = 1; pagina <= totalPaginas; pagina += 1) {
+        pdf.setPage(pagina);
+        pdf.setFont("times", "normal");
+        pdf.setFontSize(8);
+        pdf.text(
+          `PÁGINA ${pagina} DE ${totalPaginas}`,
+          larguraPagina - 12,
+          alturaPagina - 7,
+          { align: "right" }
+        );
+      }
+      pdf.save("relatorio_alvos.pdf");
+    } catch (erro) {
+      console.error("Erro ao gerar fichas dos alvos:", erro);
+      alert("Não foi possível gerar o PDF. Verifique as imagens e tente novamente.");
     }
-
-    const totalPaginas = pdf.internal.getNumberOfPages();
-    for (let pagina = 1; pagina <= totalPaginas; pagina += 1) {
-      pdf.setPage(pagina);
-      pdf.setFont("times", "normal");
-      pdf.setFontSize(8);
-      pdf.text(`PÁGINA ${pagina} DE ${totalPaginas}`, pdfWidth - 12, pageHeight - 7, {
-        align: "right",
-      });
-    }
-
-    pdf.save("relatorio_alvos.pdf");
   }
 
   return (
@@ -258,27 +286,32 @@ export default function ConsultaAlvos() {
 
           {alvosSelecionados.length > 0 && (
             <>
-              {/* Conteúdo PDF */}
-              <div
-                id="pdf-content"
-                ref={pdfContentRef}
-                style={{
-                  width: "210mm",
-                  minHeight: "297mm",
-                  padding: "20mm",
-                  backgroundColor: "white",
-                  boxSizing: "border-box",
-                  fontFamily: "Times New Roman, Times, serif",
-                  textTransform: "uppercase",
-                }}
-              >
+              {/* Cada ficha é renderizada isoladamente em uma página A4. */}
+              <div id="pdf-content" ref={pdfContentRef}>
+                {alvos
+                  .filter((a) => alvosSelecionados.includes(a.id))
+                  .map((alvo) => (
+                    <div
+                      key={alvo.id}
+                      data-ficha-alvo
+                      style={{
+                        width: "210mm",
+                        minHeight: "297mm",
+                        padding: "14mm 15mm 18mm",
+                        backgroundColor: "white",
+                        boxSizing: "border-box",
+                        fontFamily: "Times New Roman, Times, serif",
+                        textTransform: "uppercase",
+                        overflowWrap: "anywhere",
+                      }}
+                    >
                 {/* Cabeçalho */}
                 <div
                   style={{
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    marginBottom: "20px",
+                    marginBottom: "14px",
                     borderBottom: "2px solid black",
                     paddingBottom: "10px",
                   }}
@@ -312,30 +345,22 @@ export default function ConsultaAlvos() {
                     textAlign: "center",
                     fontSize: "24px",
                     fontWeight: "bold",
-                    marginBottom: "30px",
+                    marginBottom: "18px",
                   }}
                 >
                   Operação {operacoes.find((op) => op.id === operacaoSelecionada)?.nome_operacao || "Relatório de Alvos"}
                 </h1>
 
-                {/* Alvos */}
-                {alvos
-                  .filter((a) => alvosSelecionados.includes(a.id))
-                  .map((alvo) => (
-                    <div
-                      key={alvo.id}
-                      style={{
-                        pageBreakInside: "avoid",
-                        marginBottom: "40px",
-                        padding: "15px",
-                        border: "1px solid #000",
-                        borderRadius: "0",
-                        boxShadow: "none",
-                        width: "100%",
-                      }}
-                    >
+                      <div
+                        style={{
+                          padding: "12px",
+                          border: "1px solid #000",
+                          boxSizing: "border-box",
+                          width: "100%",
+                        }}
+                      >
                       {/* Alvo, nome e cpf centralizados */}
-                      <div style={{ textAlign: "center", marginBottom: "20px" }}>
+                      <div style={{ textAlign: "center", marginBottom: "12px" }}>
                         <h2 style={{ fontSize: "20px", fontWeight: "600", margin: "0 0 5px" }}>
                           Alvo 0{alvo.numero_alvo}
                         </h2>
@@ -348,13 +373,14 @@ export default function ConsultaAlvos() {
                       </div>
 
                       {/* Foto do Alvo centralizada pequena + observação abaixo */}
-                      <div style={{ textAlign: "center", marginBottom: "30px" }}>
+                      <div style={{ textAlign: "center", marginBottom: "18px" }}>
                         {urlsAssinadas[alvo.id]?.fotoAlvo && (
                           <img
                             src={urlsAssinadas[alvo.id].fotoAlvo}
                             alt={`Foto do alvo ${alvo.numero_alvo}`}
                             style={{
-                              maxWidth: "150px",
+                              maxWidth: "145px",
+                              maxHeight: "155px",
                               height: "auto",
                               borderRadius: "6px",
                               border: "1px solid #000",
@@ -414,7 +440,7 @@ export default function ConsultaAlvos() {
                                 objectFit: "contain",
                                 borderRadius: "4px",
                                 marginBottom: "10px",
-                                maxHeight: "250px",
+                                maxHeight: "210px",
                               }}
                               crossOrigin="anonymous"
                             />
@@ -433,6 +459,7 @@ export default function ConsultaAlvos() {
                             </>
                           )}
                         </div>
+                      </div>
                       </div>
                     </div>
                   ))}
