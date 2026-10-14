@@ -1,0 +1,256 @@
+import { useState, useEffect } from "react";
+import { supabase } from "../supabase/client";
+import { useNavigate } from "react-router-dom";
+
+export default function AutoCircunstanciado() {
+  const [operacoes, setOperacoes] = useState([]);
+  const [operacaoSelecionada, setOperacaoSelecionada] = useState(null);
+  const [alvos, setAlvos] = useState([]);
+  const [encerramentos, setEncerramentos] = useState([]);
+  const navigate = useNavigate();
+
+  // Busca todas as operações
+  useEffect(() => {
+    async function fetchOperacoes() {
+      const { data, error } = await supabase
+        .from("operacoes")
+        .select("id, nome_operacao, numero_autos")
+        .order("created_at", { ascending: false });
+
+      if (error) console.error("Erro ao buscar operações:", error);
+      else setOperacoes(data);
+    }
+    fetchOperacoes();
+  }, []);
+  useEffect(() => {
+  const operacaoSalva = localStorage.getItem(
+    "operacaoSelecionada"
+  );
+
+  if (operacaoSalva) {
+    try {
+      setOperacaoSelecionada(
+        JSON.parse(operacaoSalva)
+      );
+    } catch (err) {
+      console.error(err);
+    }
+  }
+}, []);
+
+  // Busca alvos e encerramentos ao selecionar operação
+  useEffect(() => {
+    if (!operacaoSelecionada) {
+      setAlvos([]);
+      setEncerramentos([]);
+      return;
+    }
+
+    async function fetchDados() {
+      try {
+        // 1️⃣ Buscar alvos
+        const { data: alvosData, error: alvosError } = await supabase
+          .from("alvos")
+          .select("*")
+          .eq("operacao_id", operacaoSelecionada.id);
+
+        if (alvosError) throw alvosError;
+        setAlvos(alvosData || []);
+
+        // 2️⃣ Buscar encerramentos por alvo
+        const encerramentosData = [];
+        for (let alvo of alvosData) {
+          const { data, error } = await supabase
+            .from("operacoes_encerramento")
+            .select("*")
+            .eq("alvo_id", alvo.id);
+
+          if (error) throw error;
+          encerramentosData.push(...data);
+        }
+        setEncerramentos(encerramentosData);
+      } catch (err) {
+        console.error("Erro ao buscar dados:", err);
+      }
+    }
+
+    fetchDados();
+  }, [operacaoSelecionada]);
+
+  function getStatusAlvo(alvoId) {
+    return encerramentos.find((e) => e.alvo_id === alvoId) || null;
+  }
+
+  // Busca itens apreendidos
+  async function fetchItens(alvoId) {
+    const { data, error } = await supabase
+      .from("materiais_apreendidos")
+      .select("*")
+      .eq("alvo_id", alvoId);
+
+    if (error) {
+      console.error("Erro ao buscar itens apreendidos:", error);
+      return [];
+    }
+    return data || [];
+  }
+
+  // Botão Cautela
+  const handleCautela = async (alvo) => {
+    const itens = await fetchItens(alvo.id);
+
+    localStorage.setItem("itensApreendidos", JSON.stringify(itens));
+    localStorage.setItem("nomeAlvo", alvo.nome || "");
+    localStorage.setItem("alvoId", alvo.id);
+
+    navigate("/cautela");
+  };
+
+  // Botão Auto
+  const handleAuto = async (alvo) => {
+    localStorage.setItem("alvoId", alvo.id);
+    navigate("/auto");
+  };
+
+  //botão Custodia 
+  const handleCustodia = (alvo) => {
+  localStorage.setItem("alvoId", alvo.id);
+  navigate("/selecionar-custodia");
+};
+
+  // Botão Formulário Celular
+  const handleFormularioCelular = async (alvo) => {
+    localStorage.setItem("alvoId", alvo.id);
+    navigate("/selecionar-celular");
+  };
+
+  function handleSelecionarOperacao(event) {
+  const id = event.target.value;
+  const operacao = operacoes.find((op) => op.id === id);
+
+  setOperacaoSelecionada(operacao);
+
+  localStorage.setItem(
+    "operacaoSelecionada",
+    JSON.stringify(operacao)
+  );
+}
+
+  return (
+    <div className="gecor-work-panel p-8 max-w-5xl mx-auto">
+      <button
+        onClick={() => navigate(-1)}
+        className="mb-4 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
+      >
+        Voltar
+      </button>
+
+      <h1 className="text-2xl mb-6 font-bold">Gerar Documentação</h1>
+
+      <label htmlFor="operacao-select" className="block mb-2">
+        Selecione a Operação:
+      </label>
+      <select
+        id="operacao-select"
+        className="w-full p-2 border rounded"
+        onChange={handleSelecionarOperacao}
+        defaultValue=""
+      >
+        <option value="" disabled>
+          Selecione...
+        </option>
+        {operacoes.map((op) => (
+          <option key={op.id} value={op.id}>
+            {op.nome_operacao} - Autos: {op.numero_autos}
+          </option>
+        ))}
+      </select>
+
+      {operacaoSelecionada && (
+        <div className="mt-6">
+          <h2 className="text-xl font-semibold mb-4">
+            Alvos da operação: {operacaoSelecionada.nome_operacao}
+          </h2>
+
+          {alvos.length === 0 ? (
+            <p>Sem alvos cadastrados para esta operação.</p>
+          ) : (
+            <table className="w-full table-auto border-collapse border border-gray-300">
+              <thead>
+                <tr className="bg-gray-200">
+                  <th className="border border-gray-300 px-4 py-2 text-left">
+                    Nome do Alvo
+                  </th>
+                  <th className="border border-gray-300 px-4 py-2 text-center">
+                    Nº do Alvo
+                  </th>
+                  <th className="border border-gray-300 px-4 py-2 text-center">
+                    Ações / Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {alvos.map((alvo) => {
+                  const status = getStatusAlvo(alvo.id);
+                  return (
+                    <tr key={alvo.id} className="hover:bg-gray-100">
+                      <td className="border border-gray-300 px-4 py-2">
+                        {alvo.nome}
+                      </td>
+                      <td className="border border-gray-300 px-4 py-2 text-center">
+                        {alvo.numero_alvo}
+                      </td>
+                     <td className="border border-gray-300 px-4 py-2 text-center">
+  <div className="flex flex-col items-center gap-2">
+    <div className="grid grid-cols-2 gap-2">
+      <button
+        onClick={() => handleAuto(alvo)}
+        className="w-24 bg-blue-500 text-white py-1 rounded hover:bg-blue-600"
+      >
+        Auto
+      </button>
+
+      <button
+        onClick={() => handleFormularioCelular(alvo)}
+        className="w-24 bg-green-500 text-white py-1 rounded hover:bg-green-600"
+      >
+        Celular
+      </button>
+
+      <button
+        onClick={() => handleCustodia(alvo)}
+        className="w-24 bg-pink-500 text-white py-1 rounded hover:bg-pink-600"
+      >
+        Custódia
+      </button>
+
+      <button
+        onClick={() => handleCautela(alvo)}
+        className="w-24 bg-yellow-500 text-white py-1 rounded hover:bg-yellow-600"
+      >
+        Cautela
+      </button>
+    </div>
+
+    {status?.encerrado ? (
+      <span className="text-green-600 font-semibold text-sm">
+        ✅ Encerrada
+      </span>
+    ) : (
+      <span className="text-gray-500 text-sm">
+        ⏳ Em andamento
+      </span>
+    )}
+  </div>
+</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -55,7 +55,15 @@ export default function AutoCircunstanciado() {
           .eq("operacao_id", operacaoSelecionada.id);
 
         if (alvosError) throw alvosError;
-        setAlvos(alvosData || []);
+        // Ordenação numérica crescente dos alvos, inclusive quando numero_alvo é texto.
+        const alvosOrdenados = [...(alvosData || [])].sort((a, b) =>
+          String(a.numero_alvo ?? "").localeCompare(
+            String(b.numero_alvo ?? ""),
+            "pt-BR",
+            { numeric: true, sensitivity: "base" }
+          )
+        );
+        setAlvos(alvosOrdenados);
 
         // 2️⃣ Buscar encerramentos por alvo
         const encerramentosData = [];

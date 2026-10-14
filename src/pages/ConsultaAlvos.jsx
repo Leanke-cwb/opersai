@@ -76,7 +76,18 @@ export default function ConsultaAlvos() {
       if (error) {
         console.error("Erro ao carregar alvos", error);
       } else {
-        setAlvos(data);
+        // Ordenação numérica: 1, 2, 3 ... 10, 11 (e não 1, 10, 11, 2).
+        const compararNumeroAlvo = new Intl.Collator("pt-BR", {
+          numeric: true,
+          sensitivity: "base",
+        });
+        const alvosOrdenados = [...(data || [])].sort((a, b) =>
+          compararNumeroAlvo.compare(
+            String(a.numero_alvo ?? ""),
+            String(b.numero_alvo ?? "")
+          )
+        );
+        setAlvos(alvosOrdenados);
         setAlvosSelecionados([]);
       }
     }
